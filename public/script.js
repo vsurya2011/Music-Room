@@ -9,9 +9,10 @@ function createRoom() {
 
 function joinRoom() {
   const roomId = document.getElementById("room").value.trim();
-  const username = document.getElementById("username").value.trim() || "Guest";
+  const username = document.getElementById("username").value.trim();
 
   if (!roomId) return alert("Please enter or create a room code!");
+  if (!username) return alert("Please enter your username before joining!");
 
   localStorage.setItem("roomId", roomId);
   localStorage.setItem("username", username);
@@ -26,17 +27,22 @@ function initRoom() {
   const socket = io();
   const player = document.getElementById("player");
   const roomCode = localStorage.getItem("roomId");
+  const username = localStorage.getItem("username");
+
   document.getElementById("roomCode").innerText = roomCode;
+  socket.emit("joinRoom", { roomId: roomCode, username });
 
-  // Join the room on server
-  socket.emit("joinRoom", roomCode);
+  const userList = document.getElementById("userList");
 
-  // Unlock audio playback for some browsers
-  const startBtn = document.getElementById("startBtn");
-  startBtn.onclick = () => {
-    player.play().then(() => player.pause());
-    startBtn.style.display = "none";
-  };
+  // Update user list when server sends updates
+  socket.on("updateUsers", (users) => {
+    userList.innerHTML = "";
+    users.forEach(u => {
+      const li = document.createElement("li");
+      li.textContent = u;
+      userList.appendChild(li);
+    });
+  });
 
   // Function to play a song
   window.changeSong = function (type) {
@@ -51,7 +57,6 @@ function initRoom() {
     player.currentTime = 0;
     player.play();
 
-    // Notify other users
     socket.emit("playSong", { roomId: roomCode, song, time: 0 });
   };
 
@@ -64,9 +69,25 @@ function initRoom() {
     socket.emit("pauseSong", { roomId: roomCode });
   };
 
-  // Listen to server for updates from other users
+  // Autoplay next song when current ends
+  player.onended = () => {
+    const allSongs = [
+      ...Array.from(document.getElementById("tamilSongs").options).map(o => o.value),
+      ...Array.from(document.getElementById("englishSongs").options).map(o => o.value)
+    ];
+    const currentIndex = allSongs.indexOf(player.src.split("/").slice(-2).join("/"));
+    const nextIndex = (currentIndex + 1) % allSongs.length;
+    const nextSong = allSongs[nextIndex];
+    player.src = nextSong;
+    player.play();
+    socket.emit("playSong", { roomId: roomCode, song: nextSong, time: 0 });
+  };
+
+  // Sync updates from others
   socket.on("playSong", (data) => {
-    if (data.song && player.src !== data.song) player.src = data.song;
+    if (data.song && player.src !== location.origin + "/" + data.song) {
+      player.src = data.song;
+    }
     player.currentTime = data.time || 0;
     player.play().catch(err => console.log("Autoplay blocked:", err));
   });
@@ -76,14 +97,14 @@ function initRoom() {
   });
 
   socket.on("syncTime", (data) => {
-    if (player.src === data.song) {
+    if (player.src.endsWith(data.song)) {
       const diff = Math.abs(player.currentTime - data.time);
       if (diff > 0.5) player.currentTime = data.time;
     }
   });
 }
 
-// Automatically initialize room logic if on room.html
-if (document.getElementById("player")) {
-  initRoom();
+// Initialize if on room.html
+if (window.location.pathname.endsWith("room.html")) {
+  window.onload = initRoom;
 }

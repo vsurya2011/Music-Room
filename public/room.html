@@ -34,15 +34,19 @@
     button { width:100%; padding:12px; margin-bottom:15px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:16px; font-weight:500; cursor:pointer; transition:0.3s;}
     button:hover { background:#ff4757;}
     audio { width:100%; margin-top:20px; border-radius:8px; outline:none;}
+    ul { list-style:none; margin:10px 0; padding:0; }
+    li { background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:6px; margin:4px 0; }
     @media (max-width:450px) { .container{width:95%; padding:20px;} }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>🎤 Welcome to Room <span id="roomCode"></span></h2>
+    <h2>🎤 Room <span id="roomCode"></span></h2>
 
-    <!-- Start button to unlock audio -->
-    <button id="startBtn">Start Listening</button>
+    <div id="friends">
+      <h3>👥 Friends Joined</h3>
+      <ul id="userList"></ul>
+    </div>
 
     <!-- Tamil Songs -->
     <div>
@@ -58,7 +62,7 @@
     <div>
       <h3>🎶 English Songs</h3>
       <select id="englishSongs">
-       <option value="songs/english/song1.mp3">A thousand years</option>
+        <option value="songs/english/song1.mp3">A thousand years</option>
         <option value="songs/english/song2.mp3">Arcade</option>
         <option value="songs/english/song3.mp3">As it was</option>
         <option value="songs/english/song4.mp3">Ashe Moral of the Story</option>
@@ -128,6 +132,7 @@
         <option value="songs/english/song68.mp3">Without me</option>
         <option value="songs/english/song69.mp3">World’s smallest violin</option>
         <option value="songs/english/song70.mp3">Worth it</option>
+
       </select>
       <button onclick="changeSong('english')">Play English Song</button>
     </div>

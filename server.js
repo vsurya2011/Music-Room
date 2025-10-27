@@ -20,58 +20,59 @@ app.get("/room/:roomId", (req, res) => {
 });
 
 // Room state
-const rooms = {}; // { roomId: { song, time, playing, lastUpdate } }
+const rooms = {}; // { roomId: { song, time, playing, lastUpdate, users: [] } }
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("joinRoom", (roomId) => {
+  socket.on("joinRoom", ({ roomId, username }) => {
     socket.join(roomId);
-    console.log(`${socket.id} joined room ${roomId}`);
+    socket.roomId = roomId;
+    socket.username = username;
+
+    if (!rooms[roomId]) rooms[roomId] = { users: [] };
+    rooms[roomId].users.push(username);
+
+    console.log(`${username} joined room ${roomId}`);
+
+    io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
     // Send current state to new user
-    if (rooms[roomId]) {
-      const room = rooms[roomId];
+    const room = rooms[roomId];
+    if (room.song) {
       let currentTime = room.time;
-
-      // If song is playing, calculate elapsed time since last update
       if (room.playing && room.lastUpdate) {
         currentTime += (Date.now() - room.lastUpdate) / 1000;
       }
-
       socket.emit("playSong", { song: room.song, time: currentTime, playing: room.playing });
     }
   });
 
   socket.on("playSong", (data) => {
     const { roomId, song, time } = data;
+    if (!rooms[roomId]) rooms[roomId] = { users: [] };
 
-    if (!rooms[roomId]) rooms[roomId] = {};
     rooms[roomId].song = song;
     rooms[roomId].time = time;
     rooms[roomId].playing = true;
     rooms[roomId].lastUpdate = Date.now();
 
-    // Broadcast to others
     socket.to(roomId).emit("playSong", { song, time, playing: true });
   });
 
   socket.on("pauseSong", (data) => {
     const { roomId } = data;
-
     if (rooms[roomId]) {
-      // Update time based on elapsed
       if (rooms[roomId].playing && rooms[roomId].lastUpdate) {
         rooms[roomId].time += (Date.now() - rooms[roomId].lastUpdate) / 1000;
       }
       rooms[roomId].playing = false;
       rooms[roomId].lastUpdate = null;
     }
-
     socket.to(roomId).emit("pauseSong");
   });
 
-  // Optional: periodic sync for all clients every 1 second
+  // Periodic sync
   setInterval(() => {
     for (const roomId in rooms) {
       const room = rooms[roomId];
@@ -83,7 +84,12 @@ io.on("connection", (socket) => {
   }, 1000);
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    if (socket.roomId && rooms[socket.roomId]) {
+      const room = rooms[socket.roomId];
+      room.users = room.users.filter(u => u !== socket.username);
+      io.to(socket.roomId).emit("updateUsers", room.users);
+      console.log(`${socket.username} left room ${socket.roomId}`);
+    }
   });
 });
 
