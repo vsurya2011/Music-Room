@@ -7,7 +7,6 @@
   <script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
-
     body {
       background: url('AI.jpg') no-repeat center center fixed;
       background-size: cover;
@@ -18,49 +17,45 @@
       padding: 40px 20px;
       color: #fff;
     }
-
     .container {
       background: rgba(0, 0, 0, 0.5);
       border-radius: 15px;
-      padding: 30px 40px;
-      width: 400px;
+      padding: 20px 24px;
+      width: 420px;
       backdrop-filter: blur(10px);
       box-shadow: 0 8px 25px rgba(0,0,0,0.3);
     }
-
-    h2 { text-align:center; margin-bottom: 25px; font-size:28px; font-weight:700; text-shadow: 1px 1px 5px rgba(0,0,0,0.7);}
-    h3 { margin:15px 0 10px; font-size:20px; font-weight:500;}
-    select { width:100%; padding:10px 12px; margin-bottom:10px; border-radius:8px; border:none; font-size:16px;}
-    button { width:100%; padding:12px; margin-bottom:15px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:16px; font-weight:500; cursor:pointer; transition:0.3s;}
-    button:hover { background:#ff4757;}
-    audio { width:100%; margin-top:20px; border-radius:8px; outline:none;}
-    ul { list-style:none; margin:10px 0; padding:0; }
-    li { background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:6px; margin:4px 0; }
-    @media (max-width:450px) { .container{width:95%; padding:20px;} }
+    h2 { text-align:center; margin-bottom: 8px; font-size:24px; font-weight:700; text-shadow: 1px 1px 5px rgba(0,0,0,0.7);}
+    #nowPlaying { text-align:center; margin:8px 0 16px; color:#00e6c3; font-weight:600; }
+    label { display:block; margin:8px 0 6px; font-weight:500; }
+    select { width:100%; padding:10px 12px; margin-bottom:10px; border-radius:8px; border:none; font-size:15px;}
+    button { width:100%; padding:10px; margin-bottom:12px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:15px; font-weight:500; cursor:pointer; transition:0.2s;}
+    button:hover { background:#ff4757; }
+    audio { width:100%; margin-top:12px; border-radius:8px; outline:none; background:rgba(255,255,255,0.04); padding:6px;}
+    @media (max-width:450px) { .container{width:95%; padding:16px;} }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>🎤 Room <span id="roomCode"></span></h2>
+    <div id="nowPlaying" aria-live="polite">🎶 Now Playing: None</div>
 
-    <div id="friends">
-      <h3>👥 Friends Joined</h3>
-      <ul id="userList"></ul>
-    </div>
+    <label for="userSelect">👥 Friends in room</label>
+    <select id="userSelect" size="3" style="height:auto;"></select>
 
-    <!-- Tamil Songs -->
+    <hr style="margin:12px 0 14px; border:none; height:1px; background:rgba(255,255,255,0.06)">
+
     <div>
-      <h3>🎵 Tamil Songs</h3>
+      <h3 style="margin:0 0 8px;">🎵 Tamil Songs</h3>
       <select id="tamilSongs">
         <option value="songs/tamil/song1.mp3">Adaada Adaada</option>
         <option value="songs/tamil/song2.mp3">Asku Laska</option>
       </select>
-      <button onclick="changeSong('tamil')">Play Tamil Song</button>
+      <button id="playTamilBtn">Play Tamil Song</button>
     </div>
 
-    <!-- English Songs -->
-    <div>
-      <h3>🎶 English Songs</h3>
+    <div style="margin-top:10px;">
+      <h3 style="margin:0 0 8px;">🎶 English Songs</h3>
       <select id="englishSongs">
         <option value="songs/english/song1.mp3">A thousand years</option>
         <option value="songs/english/song2.mp3">Arcade</option>
@@ -134,7 +129,7 @@
         <option value="songs/english/song70.mp3">Worth it</option>
 
       </select>
-      <button onclick="changeSong('english')">Play English Song</button>
+      <button id="playEnglishBtn">Play English Song</button>
     </div>
 
     <audio id="player" controls></audio>

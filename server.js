@@ -30,11 +30,13 @@ io.on("connection", (socket) => {
     socket.roomId = roomId;
     socket.username = username;
 
-    if (!rooms[roomId]) rooms[roomId] = { users: [] };
-    rooms[roomId].users.push(username);
+    if (!rooms[roomId]) rooms[roomId] = { users: [], song: null, time: 0, playing: false, lastUpdate: null };
+    // avoid duplicates
+    if (!rooms[roomId].users.includes(username)) rooms[roomId].users.push(username);
 
     console.log(`${username} joined room ${roomId}`);
 
+    // Broadcast updated user list to everyone in room
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
     // Send current state to new user
@@ -44,20 +46,28 @@ io.on("connection", (socket) => {
       if (room.playing && room.lastUpdate) {
         currentTime += (Date.now() - room.lastUpdate) / 1000;
       }
-      socket.emit("playSong", { song: room.song, time: currentTime, playing: room.playing });
+      // send playSong to new user (it will be applied by client)
+      socket.emit("playSong", { song: room.song, time: currentTime, playing: room.playing, songName: room.songName });
+      // Also broadcast nowPlaying info for UI (optional)
+      io.to(roomId).emit("nowPlaying", { songName: room.songName || null });
     }
   });
 
   socket.on("playSong", (data) => {
-    const { roomId, song, time } = data;
-    if (!rooms[roomId]) rooms[roomId] = { users: [] };
+    const { roomId, song, time, songName } = data;
+    if (!rooms[roomId]) rooms[roomId] = { users: [], song: null, time: 0, playing: false, lastUpdate: null };
 
+    // Update room state
     rooms[roomId].song = song;
-    rooms[roomId].time = time;
+    rooms[roomId].songName = songName || song;
+    rooms[roomId].time = time || 0;
     rooms[roomId].playing = true;
     rooms[roomId].lastUpdate = Date.now();
 
-    socket.to(roomId).emit("playSong", { song, time, playing: true });
+    // Broadcast to everyone in room (including the origin) so everyone's controls follow
+    io.to(roomId).emit("playSong", { song, time: rooms[roomId].time, playing: true, songName: rooms[roomId].songName });
+    // Send nowPlaying for UI
+    io.to(roomId).emit("nowPlaying", { songName: rooms[roomId].songName });
   });
 
   socket.on("pauseSong", (data) => {
@@ -69,14 +79,27 @@ io.on("connection", (socket) => {
       rooms[roomId].playing = false;
       rooms[roomId].lastUpdate = null;
     }
-    socket.to(roomId).emit("pauseSong");
+    // Broadcast pause to everyone in room
+    io.to(roomId).emit("pauseSong", {});
   });
 
-  // Periodic sync
-  setInterval(() => {
+  socket.on("requestState", ({ roomId }) => {
+    if (rooms[roomId] && rooms[roomId].song) {
+      const room = rooms[roomId];
+      let currentTime = room.time;
+      if (room.playing && room.lastUpdate) {
+        currentTime += (Date.now() - room.lastUpdate) / 1000;
+      }
+      // send current state to requester
+      socket.emit("playSong", { song: room.song, time: currentTime, playing: room.playing, songName: room.songName });
+    }
+  });
+
+  // Periodic sync for everyone in active rooms every 1s
+  const syncInterval = setInterval(() => {
     for (const roomId in rooms) {
       const room = rooms[roomId];
-      if (room.playing) {
+      if (room.playing && room.lastUpdate) {
         const elapsed = (Date.now() - room.lastUpdate) / 1000;
         io.to(roomId).emit("syncTime", { song: room.song, time: room.time + elapsed });
       }
@@ -84,11 +107,16 @@ io.on("connection", (socket) => {
   }, 1000);
 
   socket.on("disconnect", () => {
+    clearInterval(syncInterval);
     if (socket.roomId && rooms[socket.roomId]) {
       const room = rooms[socket.roomId];
       room.users = room.users.filter(u => u !== socket.username);
       io.to(socket.roomId).emit("updateUsers", room.users);
       console.log(`${socket.username} left room ${socket.roomId}`);
+      // if room empty, optionally delete it
+      if (room.users.length === 0) {
+        delete rooms[socket.roomId];
+      }
     }
   });
 });
