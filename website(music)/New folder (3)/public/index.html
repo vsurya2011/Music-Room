@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎵 Shared Music Room</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container" id="login-screen">
+    <h1>🎶 Shared Music Room</h1>
+    <input type="text" id="username" placeholder="Enter your name">
+    <input type="text" id="room" placeholder="Room Code (leave empty to create)">
+    <div class="buttons">
+        <button id="create-room">Create Room</button>
+        <button id="join-room">Join Room</button>
+    </div>
+</div>
+
+<div class="container" id="room-screen" style="display:none;">
+    <h1>Room: <span id="room-id"></span></h1>
+    <div class="playlist">
+        <select id="song-select">
+            <option value="song1.mp3">Song 1</option>
+            <option value="song2.mp3">Song 2</option>
+            <option value="song3.mp3">Song 3</option>
+            <option value="song4.mp3">Song 4</option>
+            <option value="song5.mp3">Song 5</option>
+        </select>
+        <button id="play-btn">▶️ Play / ⏸ Pause</button>
+    </div>
+    <audio id="audio-player" controls></audio>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
