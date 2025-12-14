@@ -17,7 +17,7 @@ const io = new Server(server);
 app.use(express.static(path.join(__dirname, "public")));
 
 // --------------------
-// Uploads setup (NEW)
+// Uploads setup
 // --------------------
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -157,34 +157,36 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
-    if (roomId && rooms[roomId]) {
-      rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
-      io.to(roomId).emit("updateUsers", rooms[roomId].users);
-     if (rooms[roomId].users.length === 0) {
-  const room = rooms[roomId];
+    if (!roomId || !rooms[roomId]) return;
 
- if (rooms[roomId].users.length === 0) {
-  const room = rooms[roomId];
+    rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
+    io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-  // auto delete uploaded song file
-  if (room.song && room.song.startsWith("/uploads/")) {
-    const filePath = path.resolve(__dirname, "." + room.song);
+    // 🔥 AUTO DELETE SONG WHEN ROOM EMPTY
+    if (rooms[roomId].users.length === 0) {
+      const room = rooms[roomId];
 
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.log("⚠️ Failed to delete song:", err.message);
-      } else {
-        console.log("🗑️ Deleted uploaded song:", room.song);
+      if (room.song && room.song.startsWith("/uploads/")) {
+        const filePath = path.resolve(__dirname, "." + room.song);
+
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.log("⚠️ Failed to delete song:", err.message);
+          } else {
+            console.log("🗑️ Deleted uploaded song:", room.song);
+          }
+        });
       }
-    });
-  }
 
-  delete rooms[roomId];
-}
-
+      delete rooms[roomId];
+    }
+  });
+});
 
 // --------------------
+// Server start
+// --------------------
 const port = process.env.PORT || 3000;
-server.listen(port, () =>
-  console.log(`✅ Server running on port ${port}`)
-);
+server.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
+});
