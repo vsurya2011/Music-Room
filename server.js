@@ -27,17 +27,13 @@ if (!fs.existsSync(uploadsDir)) {
 const storage = multer.diskStorage({
   destination: uploadsDir,
   filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "-" + file.originalname;
-    cb(null, uniqueName);
+    cb(null, Date.now() + "-" + file.originalname);
   }
 });
 
 const upload = multer({ storage });
-
-// expose uploads publicly
 app.use("/uploads", express.static(uploadsDir));
 
-// upload endpoint
 app.post("/upload", upload.single("song"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
@@ -71,7 +67,7 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", ({ roomId, username }) => {
     socket.join(roomId);
     socket.roomId = roomId;
-    socket.username = username;
+    socket.username = username || "Guest";
 
     if (!rooms[roomId]) {
       rooms[roomId] = {
@@ -86,8 +82,8 @@ io.on("connection", (socket) => {
       };
     }
 
-    if (!rooms[roomId].users.includes(username)) {
-      rooms[roomId].users.push(username);
+    if (!rooms[roomId].users.includes(socket.username)) {
+      rooms[roomId].users.push(socket.username);
     }
 
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
@@ -111,19 +107,18 @@ io.on("connection", (socket) => {
   });
 
   socket.on("playSong", (data) => {
-    const { roomId, song, songBase64, songName, time, category } = data;
-    const room = rooms[roomId];
+    const room = rooms[data.roomId];
     if (!room) return;
 
-    room.song = song || null;
-    room.songBase64 = songBase64 || null;
-    room.songName = songName || "Shared Song";
-    room.time = time || 0;
+    room.song = data.song || null;
+    room.songBase64 = data.songBase64 || null;
+    room.songName = data.songName || "Shared Song";
+    room.time = data.time || 0;
     room.playing = true;
     room.lastUpdate = Date.now();
-    room.category = category || "both";
+    room.category = data.category || "both";
 
-    io.to(roomId).emit("playSong", {
+    io.to(data.roomId).emit("playSong", {
       song: room.song,
       songBase64: room.songBase64,
       songName: room.songName,
@@ -155,6 +150,9 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("syncTime", { time });
   });
 
+  // --------------------
+  // Disconnect + auto delete
+  // --------------------
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
@@ -162,23 +160,16 @@ io.on("connection", (socket) => {
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // 🔥 AUTO DELETE SONG WHEN ROOM EMPTY
     if (rooms[roomId].users.length === 0) {
       const room = rooms[roomId];
 
       if (room.song && room.song.startsWith("/uploads/")) {
         const filePath = path.resolve(__dirname, "." + room.song);
-
-        fs.unlink(filePath, (err) => {
-          if (err) {
-            console.log("⚠️ Failed to delete song:", err.message);
-          } else {
-            console.log("🗑️ Deleted uploaded song:", room.song);
-          }
-        });
+        fs.unlink(filePath, () => {});
       }
 
       delete rooms[roomId];
+      console.log("🧹 Room closed & cleaned:", roomId);
     }
   });
 });
