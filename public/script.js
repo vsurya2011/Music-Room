@@ -1,5 +1,5 @@
 // script.js
-// Full player logic with local file support + dropdown songs + Play/Pause/Prev/Next + progress bar sync
+// Full player logic with local file playlist support + dropdown songs + Play/Pause/Prev/Next + progress bar sync
 (function () {
   // -----------------------
   // Helper UI injector
@@ -122,17 +122,19 @@
 
     const tamilSelect = document.getElementById('tamilSongs');
     const englishSelect = document.getElementById('englishSongs');
-    const fileInput = document.getElementById('localFileInput'); // new
+    const fileInput = document.getElementById('localFileInput');
 
     let suppressEmit = false;
     let lastCategory = 'both';
-    let localFileURL = null;
+    let localFiles = []; // array of uploaded local files
+    let localIndex = 0;
 
     function getAllSongs(category = 'both') {
       const tamil = tamilSelect ? Array.from(tamilSelect.options).map(o => o.value) : [];
       const eng = englishSelect ? Array.from(englishSelect.options).map(o => o.value) : [];
       if (category === 'tamil') return tamil;
       if (category === 'english') return eng;
+      if (category === 'local') return localFiles.map(f => f.url);
       return [...tamil, ...eng];
     }
 
@@ -159,9 +161,10 @@
     socket.on('playSong', (data) => {
       suppressEmit = true;
       if (data.song) {
-        if (localFileURL !== data.song) {
+        if (!localFiles.some(f => f.url === data.song)) {
           player.src = data.song;
-          localFileURL = null; // clear local if remote song
+          localFiles = []; // clear local files if remote song
+          localIndex = 0;
         }
         player.currentTime = typeof data.time === 'number' ? data.time : 0;
         player.play().finally(() => {
@@ -236,8 +239,8 @@
     // Controls
     // -----------------------
     playPauseBtn.addEventListener('click', () => {
-      if (!player.src && localFileURL) {
-        player.src = localFileURL;
+      if (!player.src && localFiles.length) {
+        player.src = localFiles[localIndex].url;
       } else if (!player.src) {
         const sel = (englishSelect && englishSelect.value) || (tamilSelect && tamilSelect.value);
         if (sel) player.src = sel;
@@ -246,37 +249,48 @@
       else player.pause();
     });
 
-    prevBtn.addEventListener('click', () => {
-      if (localFileURL) return; // skip prev/next for local files
+    function playNext() {
       const allSongs = getAllSongs(lastCategory);
-      const curIndex = allSongs.indexOf(songPathToRelative(player.src));
-      const prevIndex = (curIndex - 1 + allSongs.length) % allSongs.length;
-      const prevSong = allSongs[prevIndex];
-      suppressEmit = true;
-      player.src = prevSong;
+      if (!allSongs.length) return;
+      if (lastCategory === 'local') {
+        localIndex = (localIndex + 1) % localFiles.length;
+        player.src = localFiles[localIndex].url;
+      } else {
+        const curIndex = allSongs.indexOf(songPathToRelative(player.src));
+        const nextIndex = (curIndex + 1) % allSongs.length;
+        player.src = allSongs[nextIndex];
+      }
       player.currentTime = 0;
       player.play().finally(() => {
-        setNowPlayingUI(prevSong);
-        socket.emit('playSong', { roomId: roomCode, song: prevSong, time: 0, songName: songNameFromPath(prevSong) });
-        setTimeout(() => { suppressEmit = false; }, 150);
+        setNowPlayingUI(player.src);
+        if (!suppressEmit) {
+          socket.emit('playSong', { roomId: roomCode, song: player.src, time: 0, songName: songNameFromPath(player.src) });
+        }
       });
-    });
+    }
 
-    nextBtn.addEventListener('click', () => {
-      if (localFileURL) return; // skip prev/next for local files
+    function playPrev() {
       const allSongs = getAllSongs(lastCategory);
-      const curIndex = allSongs.indexOf(songPathToRelative(player.src));
-      const nextIndex = (curIndex + 1) % allSongs.length;
-      const nextSong = allSongs[nextIndex];
-      suppressEmit = true;
-      player.src = nextSong;
+      if (!allSongs.length) return;
+      if (lastCategory === 'local') {
+        localIndex = (localIndex - 1 + localFiles.length) % localFiles.length;
+        player.src = localFiles[localIndex].url;
+      } else {
+        const curIndex = allSongs.indexOf(songPathToRelative(player.src));
+        const prevIndex = (curIndex - 1 + allSongs.length) % allSongs.length;
+        player.src = allSongs[prevIndex];
+      }
       player.currentTime = 0;
       player.play().finally(() => {
-        setNowPlayingUI(nextSong);
-        socket.emit('playSong', { roomId: roomCode, song: nextSong, time: 0, songName: songNameFromPath(nextSong) });
-        setTimeout(() => { suppressEmit = false; }, 150);
+        setNowPlayingUI(player.src);
+        if (!suppressEmit) {
+          socket.emit('playSong', { roomId: roomCode, song: player.src, time: 0, songName: songNameFromPath(player.src) });
+        }
       });
-    });
+    }
+
+    prevBtn.addEventListener('click', playPrev);
+    nextBtn.addEventListener('click', playNext);
 
     // -----------------------
     // Progress seeking
@@ -306,19 +320,21 @@
     window.addEventListener('touchend', () => { seeking = false; });
 
     // -----------------------
-    // Local file handling
+    // Local file handling (multi-file)
     // -----------------------
     if (fileInput) {
       fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (localFileURL) URL.revokeObjectURL(localFileURL);
-        localFileURL = URL.createObjectURL(file);
-        player.src = localFileURL;
+        const files = Array.from(e.target.files).filter(f => f.type.startsWith('audio/'));
+        if (!files.length) return;
+        // Revoke old URLs
+        localFiles.forEach(f => URL.revokeObjectURL(f.url));
+        localFiles = files.map(f => ({ file: f, url: URL.createObjectURL(f), name: f.name }));
+        localIndex = 0;
+        lastCategory = 'local';
+        player.src = localFiles[localIndex].url;
         player.currentTime = 0;
         player.play().catch(err => console.log('Play failed:', err));
-        setNowPlayingUI(localFileURL, file.name);
-        lastCategory = 'local';
+        setNowPlayingUI(localFiles[localIndex].url, localFiles[localIndex].name);
       });
     }
 
