@@ -17,12 +17,10 @@ const io = new Server(server);
 app.use(express.static(path.join(__dirname, "public")));
 
 // --------------------
-// Uploads setup
+// Upload setup
 // --------------------
 const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-}
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 const storage = multer.diskStorage({
   destination: uploadsDir,
@@ -30,15 +28,12 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "-" + file.originalname);
   }
 });
-
 const upload = multer({ storage });
+
 app.use("/uploads", express.static(uploadsDir));
 
 app.post("/upload", upload.single("song"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-
+  if (!req.file) return res.status(400).json({ error: "No file" });
   res.json({
     url: `/uploads/${req.file.filename}`,
     name: req.file.originalname
@@ -73,12 +68,10 @@ io.on("connection", (socket) => {
       rooms[roomId] = {
         users: [],
         song: null,
-        songBase64: null,
         songName: null,
         time: 0,
         playing: false,
-        lastUpdate: null,
-        category: "both"
+        lastUpdate: null
       };
     }
 
@@ -87,44 +80,23 @@ io.on("connection", (socket) => {
     }
 
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
-
-    const room = rooms[roomId];
-    if (room.song || room.songBase64) {
-      let currentTime = room.time;
-      if (room.playing && room.lastUpdate) {
-        currentTime += (Date.now() - room.lastUpdate) / 1000;
-      }
-
-      socket.emit("playSong", {
-        song: room.song,
-        songBase64: room.songBase64,
-        songName: room.songName,
-        time: currentTime,
-        playing: room.playing,
-        category: room.category
-      });
-    }
   });
 
-  socket.on("playSong", (data) => {
-    const room = rooms[data.roomId];
+  socket.on("playSong", ({ roomId, song, songName, time }) => {
+    const room = rooms[roomId];
     if (!room) return;
 
-    room.song = data.song || null;
-    room.songBase64 = data.songBase64 || null;
-    room.songName = data.songName || "Shared Song";
-    room.time = data.time || 0;
+    room.song = song;
+    room.songName = songName;
+    room.time = time || 0;
     room.playing = true;
     room.lastUpdate = Date.now();
-    room.category = data.category || "both";
 
-    io.to(data.roomId).emit("playSong", {
-      song: room.song,
-      songBase64: room.songBase64,
-      songName: room.songName,
+    io.to(roomId).emit("playSong", {
+      song,
+      songName,
       time: room.time,
-      playing: true,
-      category: room.category
+      playing: true
     });
   });
 
@@ -141,18 +113,6 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("pauseSong");
   });
 
-  socket.on("syncTime", ({ roomId, time }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-
-    room.time = time;
-    room.lastUpdate = Date.now();
-    socket.to(roomId).emit("syncTime", { time });
-  });
-
-  // --------------------
-  // Disconnect + auto delete
-  // --------------------
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
@@ -169,7 +129,7 @@ io.on("connection", (socket) => {
       }
 
       delete rooms[roomId];
-      console.log("🧹 Room closed & cleaned:", roomId);
+      console.log("🧹 Room cleaned:", roomId);
     }
   });
 });
