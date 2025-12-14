@@ -155,6 +155,63 @@
       trackTitleEl.textContent = name || 'Not Playing';
       if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: ${name || 'None'}`;
     }
+    // -----------------------
+// Local file Play & Share (UPDATED for your HTML IDs)
+// -----------------------
+const fileInput = document.getElementById("fileInput");
+const playLocalBtn = document.getElementById("playLocalBtn");
+const localStatus = document.getElementById("localStatus");
+
+if (fileInput && playLocalBtn) {
+  playLocalBtn.addEventListener("click", async () => {
+    const file = fileInput.files[0];
+    if (!file) {
+      localStatus.textContent = "❌ Please choose a song first";
+      return;
+    }
+
+    localStatus.textContent = "⏳ Uploading & sharing song...";
+
+    const formData = new FormData();
+    formData.append("song", file);
+
+    try {
+      const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!data.url) throw new Error("Upload failed");
+
+      const songUrl = data.url;
+      const songName = data.name || file.name;
+
+      // play locally without echo
+      suppressEmit = true;
+      player.src = songUrl;
+      player.currentTime = 0;
+      await player.play();
+      setNowPlayingUI(songUrl);
+
+      // broadcast to all users
+      socket.emit("playSong", {
+        roomId: roomCode,
+        song: songUrl,
+        time: 0,
+        songName
+      });
+
+      localStatus.textContent = "✅ Playing & shared with room";
+      suppressEmit = false;
+
+    } catch (err) {
+      console.error(err);
+      localStatus.textContent = "❌ Failed to upload or play song";
+    }
+  });
+}
+
 
     // --- socket handlers (kept from your code) ---
     socket.on('updateUsers', (users) => {
