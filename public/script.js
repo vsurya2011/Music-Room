@@ -1,132 +1,142 @@
-(function () {
+const socket = io();
 
-  const socket = io();
-  const player = document.getElementById("player");
-  const roomId = localStorage.getItem("roomId");
-  const username = localStorage.getItem("username");
+// ==========================
+// ROOM + USER
+// ==========================
+const roomId = localStorage.getItem("roomId");
 
-  const playBtn = document.getElementById("playPauseBtn");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
+let username = localStorage.getItem("username");
+if (!username || username.trim() === "") {
+  username = "Guest-" + Math.floor(Math.random() * 10000);
+  localStorage.setItem("username", username);
+}
 
-  const tamilSel = document.getElementById("tamilSongs");
-  const engSel = document.getElementById("englishSongs");
+// ==========================
+// ELEMENTS
+// ==========================
+const roomCodeEl = document.getElementById("roomCode");
+const userSelect = document.getElementById("userSelect");
+const nowPlaying = document.getElementById("nowPlaying");
 
-  const playTamilBtn = document.getElementById("playTamilBtn");
-  const playEnglishBtn = document.getElementById("playEnglishBtn");
+const tamilSelect = document.getElementById("tamilSongs");
+const englishSelect = document.getElementById("englishSongs");
 
-  const fileInput = document.getElementById("fileInput");
-  const playLocalBtn = document.getElementById("playLocalBtn");
+const playTamilBtn = document.getElementById("playTamilBtn");
+const playEnglishBtn = document.getElementById("playEnglishBtn");
 
-  const titleEl = document.getElementById("trackTitle");
+const fileInput = document.getElementById("fileInput");
+const playLocalBtn = document.getElementById("playLocalBtn");
+const localStatus = document.getElementById("localStatus");
 
-  let playlist = [];
-  let index = 0;
-  let category = "";
-  let suppress = false;
+const audio = document.getElementById("player");
 
-  socket.emit("joinRoom", { roomId, username });
+// ==========================
+// INIT
+// ==========================
+roomCodeEl.textContent = roomId;
+nowPlaying.textContent = "🎶 Now Playing: None";
 
-  function buildPlaylist(select) {
-    return [...select.options].map(o => o.value);
+socket.emit("joinRoom", { roomId, username });
+
+// ==========================
+// USERS LIST
+// ==========================
+socket.on("updateUsers", users => {
+  userSelect.innerHTML = "";
+  users.forEach(u => {
+    const opt = document.createElement("option");
+    opt.textContent = u;
+    userSelect.appendChild(opt);
+  });
+});
+
+// ==========================
+// PLAY
+// ==========================
+socket.on("playSong", data => {
+  audio.src = data.songBase64 || data.song;
+  audio.currentTime = data.time || 0;
+  nowPlaying.textContent = "🎶 Now Playing: " + data.songName;
+  audio.play().catch(() => {});
+});
+
+// ==========================
+// PAUSE
+// ==========================
+socket.on("pauseSong", () => {
+  audio.pause();
+});
+
+// ==========================
+// SYNC
+// ==========================
+socket.on("syncTime", ({ time }) => {
+  if (Math.abs(audio.currentTime - time) > 1) {
+    audio.currentTime = time;
   }
+});
 
-  function playIndex(i, emit = true) {
-    if (!playlist.length) return;
-    index = (i + playlist.length) % playlist.length;
-    suppress = true;
+// ==========================
+// TAMIL
+// ==========================
+playTamilBtn.onclick = () => {
+  socket.emit("playSong", {
+    roomId,
+    song: tamilSelect.value,
+    songName: tamilSelect.options[tamilSelect.selectedIndex].text,
+    time: 0
+  });
+};
 
-    player.src = playlist[index];
-    player.currentTime = 0;
-    player.play();
+// ==========================
+// ENGLISH
+// ==========================
+playEnglishBtn.onclick = () => {
+  socket.emit("playSong", {
+    roomId,
+    song: englishSelect.value,
+    songName: englishSelect.options[englishSelect.selectedIndex].text,
+    time: 0
+  });
+};
 
-    titleEl.textContent = playlist[index].split("/").pop();
+// ==========================
+// LOCAL FILE
+// ==========================
+playLocalBtn.onclick = () => {
+  const file = fileInput.files[0];
+  if (!file) return alert("Choose a file");
 
-    setTimeout(() => suppress = false, 200);
+  localStatus.textContent = "Sharing...";
 
-    if (emit) {
-      socket.emit("playSong", {
-        roomId,
-        src: player.src,
-        playlist,
-        index,
-        category,
-        time: 0
-      });
-    }
+  const reader = new FileReader();
+  reader.onload = () => {
+    socket.emit("playSong", {
+      roomId,
+      songBase64: reader.result,
+      songName: file.name,
+      time: 0
+    });
+    localStatus.textContent = "Playing for everyone 🎧";
+  };
+  reader.readAsDataURL(file);
+};
+
+// ==========================
+// PAUSE EVENT
+// ==========================
+audio.onpause = () => {
+  socket.emit("pauseSong", { roomId });
+};
+
+// ==========================
+// CONTINUOUS SYNC
+// ==========================
+setInterval(() => {
+  if (!audio.paused) {
+    socket.emit("syncTime", {
+      roomId,
+      time: audio.currentTime
+    });
   }
-
-  // ---- Tamil ----
-  playTamilBtn.onclick = () => {
-    playlist = buildPlaylist(tamilSel);
-    category = "tamil";
-    index = tamilSel.selectedIndex;
-    playIndex(index);
-  };
-
-  // ---- English ----
-  playEnglishBtn.onclick = () => {
-    playlist = buildPlaylist(engSel);
-    category = "english";
-    index = engSel.selectedIndex;
-    playIndex(index);
-  };
-
-  // ---- Local File ----
-  playLocalBtn.onclick = () => {
-    const file = fileInput.files[0];
-    if (!file) return alert("Select a file first");
-
-    const reader = new FileReader();
-    reader.onload = e => {
-      playlist = [e.target.result];
-      category = "local";
-      playIndex(0);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // ---- Controls ----
-  playBtn.onclick = () => player.paused ? player.play() : player.pause();
-  prevBtn.onclick = () => playIndex(index - 1);
-  nextBtn.onclick = () => playIndex(index + 1);
-
-  // ---- Sync ----
-  socket.on("playSong", data => {
-    suppress = true;
-    playlist = data.playlist;
-    index = data.index;
-    category = data.category;
-
-    player.src = data.src;
-    player.currentTime = data.time || 0;
-    player.play();
-
-    titleEl.textContent = data.src.split("/").pop();
-    setTimeout(() => suppress = false, 200);
-  });
-
-  socket.on("pauseSong", () => {
-    suppress = true;
-    player.pause();
-    setTimeout(() => suppress = false, 200);
-  });
-
-  setInterval(() => {
-    if (!player.paused && !suppress) {
-      socket.emit("syncTime", {
-        roomId,
-        time: player.currentTime
-      });
-    }
-  }, 2000);
-
-  socket.on("syncTime", t => {
-    if (Math.abs(player.currentTime - t) > 0.5) {
-      suppress = true;
-      player.currentTime = t;
-      setTimeout(() => suppress = false, 200);
-    }
-  });
-
-})();
+}, 1000);

@@ -19,132 +19,134 @@ app.get("/room/:roomId", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "room.html"));
 });
 
-// Room state
-const rooms = {}; // { roomId: { song, songName, songBase64, time, playing, lastUpdate, users: [], category } }
+// ==========================
+// ROOM STATE
+// ==========================
+const rooms = {};
+// roomId: { users: [], song, songName, songBase64, time, playing, lastUpdate }
 
-io.on("connection", (socket) => {
+// ==========================
+// SOCKET LOGIC
+// ==========================
+io.on("connection", socket => {
   console.log("User connected:", socket.id);
 
   socket.on("joinRoom", ({ roomId, username }) => {
+
+    // FORCE GUEST NAME
+    if (!username || username.trim() === "") {
+      username = "Guest-" + socket.id.slice(0, 4);
+    }
+
     socket.join(roomId);
     socket.roomId = roomId;
     socket.username = username;
 
-    if (!rooms[roomId])
-      rooms[roomId] = { users: [], song: null, songName: null, songBase64: null, time: 0, playing: false, lastUpdate: null, category: "both" };
-    if (!rooms[roomId].users.includes(username)) rooms[roomId].users.push(username);
+    if (!rooms[roomId]) {
+      rooms[roomId] = {
+        users: [],
+        song: null,
+        songName: null,
+        songBase64: null,
+        time: 0,
+        playing: false,
+        lastUpdate: null
+      };
+    }
 
-    console.log(`${username} joined room ${roomId}`);
+    if (!rooms[roomId].users.includes(username)) {
+      rooms[roomId].users.push(username);
+    }
 
-    // Broadcast updated user list
+    // SEND USERS
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // Send current state to new user
+    // SYNC CURRENT STATE
     const room = rooms[roomId];
     if (room.song || room.songBase64) {
       let currentTime = room.time;
       if (room.playing && room.lastUpdate) {
         currentTime += (Date.now() - room.lastUpdate) / 1000;
       }
+
       socket.emit("playSong", {
         song: room.song,
         songBase64: room.songBase64,
-        time: currentTime,
-        playing: room.playing,
         songName: room.songName,
-        category: room.category
+        time: currentTime
       });
-      io.to(roomId).emit("nowPlaying", { songName: room.songName || null });
     }
   });
 
-  socket.on("playSong", (data) => {
-    const { roomId, song, songBase64, time, songName, category } = data;
-    if (!rooms[roomId])
-      rooms[roomId] = { users: [], song: null, songName: null, songBase64: null, time: 0, playing: false, lastUpdate: null, category: "both" };
+  // ==========================
+  // PLAY SONG
+  // ==========================
+  socket.on("playSong", ({ roomId, song, songBase64, songName, time }) => {
+    const room = rooms[roomId];
+    if (!room) return;
 
-    // Update room state
-    rooms[roomId].song = song || null;
-    rooms[roomId].songBase64 = songBase64 || null;
-    rooms[roomId].songName = songName || (songBase64 ? "Local File" : song);
-    rooms[roomId].time = time || 0;
-    rooms[roomId].playing = true;
-    rooms[roomId].lastUpdate = Date.now();
-    rooms[roomId].category = category || "both";
+    room.song = song || null;
+    room.songBase64 = songBase64 || null;
+    room.songName = songName || "Unknown";
+    room.time = time || 0;
+    room.playing = true;
+    room.lastUpdate = Date.now();
 
-    // Broadcast to everyone
-    io.to(roomId).emit("playSong", { song, songBase64, time: rooms[roomId].time, playing: true, songName: rooms[roomId].songName, category: rooms[roomId].category });
-    io.to(roomId).emit("nowPlaying", { songName: rooms[roomId].songName });
+    io.to(roomId).emit("playSong", {
+      song,
+      songBase64,
+      songName: room.songName,
+      time: room.time
+    });
   });
 
+  // ==========================
+  // PAUSE SONG
+  // ==========================
   socket.on("pauseSong", ({ roomId }) => {
-    if (rooms[roomId]) {
-      if (rooms[roomId].playing && rooms[roomId].lastUpdate) {
-        rooms[roomId].time += (Date.now() - rooms[roomId].lastUpdate) / 1000;
-      }
-      rooms[roomId].playing = false;
-      rooms[roomId].lastUpdate = null;
+    const room = rooms[roomId];
+    if (!room) return;
+
+    if (room.playing && room.lastUpdate) {
+      room.time += (Date.now() - room.lastUpdate) / 1000;
     }
-    io.to(roomId).emit("pauseSong", {});
+
+    room.playing = false;
+    room.lastUpdate = null;
+
+    io.to(roomId).emit("pauseSong");
   });
 
-  socket.on("syncTime", (data) => {
-    const { roomId, song, songBase64, time } = data;
-    if (!rooms[roomId]) return;
+  // ==========================
+  // TIME SYNC
+  // ==========================
+  socket.on("syncTime", ({ roomId, time }) => {
+    const room = rooms[roomId];
+    if (!room) return;
 
-    rooms[roomId].time = time || 0;
-    rooms[roomId].lastUpdate = Date.now();
+    room.time = time;
+    room.lastUpdate = Date.now();
 
-    // Broadcast sync to others
-    io.to(roomId).emit("syncTime", { song, songBase64, time });
+    socket.to(roomId).emit("syncTime", { time });
   });
 
-  socket.on("requestState", ({ roomId }) => {
-    if (rooms[roomId] && (rooms[roomId].song || rooms[roomId].songBase64)) {
-      const room = rooms[roomId];
-      let currentTime = room.time;
-      if (room.playing && room.lastUpdate) {
-        currentTime += (Date.now() - room.lastUpdate) / 1000;
-      }
-      socket.emit("playSong", {
-        song: room.song,
-        songBase64: room.songBase64,
-        time: currentTime,
-        playing: room.playing,
-        songName: room.songName,
-        category: room.category
-      });
-    }
-  });
-
-  // Periodic sync for all active rooms
-  const syncInterval = setInterval(() => {
-    for (const roomId in rooms) {
-      const room = rooms[roomId];
-      if (room.playing && room.lastUpdate) {
-        const elapsed = (Date.now() - room.lastUpdate) / 1000;
-        io.to(roomId).emit("syncTime", {
-          song: room.song,
-          songBase64: room.songBase64,
-          time: room.time + elapsed
-        });
-      }
-    }
-  }, 1000);
-
+  // ==========================
+  // DISCONNECT
+  // ==========================
   socket.on("disconnect", () => {
-    clearInterval(syncInterval);
-    if (socket.roomId && rooms[socket.roomId]) {
-      const room = rooms[socket.roomId];
-      room.users = room.users.filter(u => u !== socket.username);
-      io.to(socket.roomId).emit("updateUsers", room.users);
-      console.log(`${socket.username} left room ${socket.roomId}`);
-      if (room.users.length === 0) {
-        delete rooms[socket.roomId];
-      }
+    const { roomId, username } = socket;
+    if (!roomId || !rooms[roomId]) return;
+
+    rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
+    io.to(roomId).emit("updateUsers", rooms[roomId].users);
+
+    if (rooms[roomId].users.length === 0) {
+      delete rooms[roomId];
     }
   });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`✅ Server running on port ${port}`));
+server.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
+});
