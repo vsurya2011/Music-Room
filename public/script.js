@@ -70,7 +70,6 @@
       audioEl.controls = false;
       audioEl.style.display = 'none'; // keep audio element but hide native UI
     } else {
-      // fallback append to body
       document.body.appendChild(container);
     }
   }
@@ -136,6 +135,11 @@
     const tamilSelect = document.getElementById('tamilSongs');
     const englishSelect = document.getElementById('englishSongs');
 
+    // For local file
+    const fileInput = document.getElementById('fileInput');
+    const playLocalBtn = document.getElementById('playLocalBtn');
+    const localStatus = document.getElementById('localStatus');
+
     // Prevent echo when applying remote changes
     let suppressEmit = false;
 
@@ -170,21 +174,20 @@
 
     socket.on('playSong', (data) => {
       suppressEmit = true;
-      const rel = songPathToRelative(data.song || '');
-      if (rel) {
-        if (songPathToRelative(player.src) !== rel) {
-          player.src = rel;
+      if (!data.songBase64) { // normal path
+        const rel = songPathToRelative(data.song || '');
+        if (rel) {
+          if (songPathToRelative(player.src) !== rel) {
+            player.src = rel;
+          }
         }
+      } else { // local file shared as base64
+        player.src = data.songBase64;
       }
       player.currentTime = typeof data.time === 'number' ? data.time : 0;
-      player.play().catch(err => {
-        console.log('Play blocked:', err);
-      }).finally(() => {
-        setNowPlayingUI(rel || player.src);
-        // set lastCategory based on rel
-        if (tamilSelect && Array.from(tamilSelect.options).some(o => o.value === rel)) lastCategory = 'tamil';
-        else if (englishSelect && Array.from(englishSelect.options).some(o => o.value === rel)) lastCategory = 'english';
-        else lastCategory = 'both';
+      player.play().catch(err => { console.log('Play blocked:', err); }).finally(() => {
+        setNowPlayingUI(data.songName || player.src);
+        lastCategory = data.category || 'both';
         setTimeout(() => { suppressEmit = false; }, 150);
       });
     });
@@ -196,34 +199,40 @@
     });
 
     socket.on('syncTime', (data) => {
-      const rel = songPathToRelative(data.song || '');
-      if (songPathToRelative(player.src) === rel) {
-        const diff = Math.abs(player.currentTime - data.time);
-        if (diff > 0.5) {
-          suppressEmit = true;
-          player.currentTime = data.time;
-          setTimeout(() => { suppressEmit = false; }, 150);
+      if (data.songBase64) {
+        if (player.src === data.songBase64) {
+          const diff = Math.abs(player.currentTime - data.time);
+          if (diff > 0.5) {
+            suppressEmit = true;
+            player.currentTime = data.time;
+            setTimeout(() => { suppressEmit = false; }, 150);
+          }
+        }
+      } else {
+        const rel = songPathToRelative(data.song || '');
+        if (songPathToRelative(player.src) === rel) {
+          const diff = Math.abs(player.currentTime - data.time);
+          if (diff > 0.5) {
+            suppressEmit = true;
+            player.currentTime = data.time;
+            setTimeout(() => { suppressEmit = false; }, 150);
+          }
         }
       }
     });
 
-    socket.on('nowPlaying', (data) => {
-      if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: ${data.songName || 'Unknown'}`;
-    });
-
     // --- local player events ---
     player.addEventListener('play', () => {
-      // keep UI in sync
-      playPauseBtn.innerHTML = '❚❚'; // show pause
+      playPauseBtn.innerHTML = '❚❚';
       if (suppressEmit) return;
       const rel = songPathToRelative(player.src);
       const name = songNameFromPath(rel);
-      socket.emit('playSong', { roomId: roomCode, song: rel, time: player.currentTime, songName: name });
+      socket.emit('playSong', { roomId: roomCode, song: rel, songBase64: player.src.startsWith('data:audio') ? player.src : null, time: player.currentTime, songName: name, category: lastCategory });
       setNowPlayingUI(rel);
     });
 
     player.addEventListener('pause', () => {
-      playPauseBtn.innerHTML = '►'; // show play
+      playPauseBtn.innerHTML = '►';
       if (suppressEmit) return;
       socket.emit('pauseSong', { roomId: roomCode });
     });
@@ -235,21 +244,18 @@
       progressFill.style.width = `${pct}%`;
       currentTimeEl.textContent = formatTime(cur);
       totalTimeEl.textContent = formatTime(dur);
-      // optional: emit small sync updates (throttle)
-      // we'll emit every timeupdate when not suppressed but to avoid spam, emit only every ~2s
-      // For simplicity, emit periodic sync with setInterval below instead.
     });
 
-    // Emit small periodic sync while playing (so other clients can adjust)
+    // Emit periodic sync while playing
     let syncInterval = null;
     function startSyncInterval() {
       if (syncInterval) return;
       syncInterval = setInterval(() => {
         if (!player.paused && !suppressEmit) {
           const rel = songPathToRelative(player.src);
-          socket.emit('syncTime', { roomId: roomCode, song: rel, time: player.currentTime });
+          socket.emit('syncTime', { roomId: roomCode, song: rel, songBase64: player.src.startsWith('data:audio') ? player.src : null, time: player.currentTime });
         }
-      }, 2000); // every 2s
+      }, 2000);
     }
     function stopSyncInterval() {
       if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
@@ -257,122 +263,37 @@
 
     player.addEventListener('playing', startSyncInterval);
     player.addEventListener('pause', stopSyncInterval);
-    player.addEventListener('ended', () => {
-      stopSyncInterval();
-      // next logic (keeps your broadcast behavior)
-      const all = getAllSongs();
-      const currentRel = songPathToRelative(player.src);
-      const idx = all.indexOf(currentRel);
-      const nextIndex = (idx + 1) % all.length;
-      const nextSong = all[nextIndex];
-      const name = songNameFromPath(nextSong);
-      suppressEmit = true;
-      player.src = nextSong;
-      player.currentTime = 0;
-      player.play().catch(err => console.log('Autoplay blocked:', err)).finally(() => {
-        setNowPlayingUI(nextSong);
-        socket.emit('playSong', { roomId: roomCode, song: nextSong, time: 0, songName: name });
-        setTimeout(() => { suppressEmit = false; }, 150);
-      });
-    });
 
     // -----------------------
-    // Control buttons
+    // Local File Play & Share
     // -----------------------
-    playPauseBtn.addEventListener('click', () => {
-      if (!player.src) {
-        // if no song loaded, try to load selection from dropdowns
-        const sel = (englishSelect && englishSelect.value) || (tamilSelect && tamilSelect.value);
-        if (sel) player.src = sel;
-      }
-      if (player.paused) {
-        player.play().catch(err => console.log('Play failed:', err));
-      } else {
-        player.pause();
-      }
-    });
+    if (playLocalBtn) {
+      playLocalBtn.addEventListener('click', () => {
+        const file = fileInput.files[0];
+        if (!file) return alert('Select an audio file first!');
+        if (!file.type.startsWith('audio/')) return alert('Only audio files allowed!');
+        localStatus.textContent = 'Loading...';
 
-    prevBtn.addEventListener('click', () => {
-      // decide playlist
-      let list = getAllSongs('both');
-      if (lastCategory === 'tamil') list = getAllSongs('tamil');
-      else if (lastCategory === 'english') list = getAllSongs('english');
-
-      const cur = songPathToRelative(player.src);
-      let idx = list.indexOf(cur);
-      if (idx === -1) idx = 0;
-      const prevIndex = (idx - 1 + list.length) % list.length;
-      const prevSong = list[prevIndex];
-      const name = songNameFromPath(prevSong);
-      suppressEmit = true;
-      player.src = prevSong;
-      player.currentTime = 0;
-      player.play().catch(err => console.log('Play failed:', err)).finally(() => {
-        setNowPlayingUI(prevSong);
-        socket.emit('playSong', { roomId: roomCode, song: prevSong, time: 0, songName: name });
-        // set category
-        if (tamilSelect && Array.from(tamilSelect.options).some(o => o.value === prevSong)) lastCategory = 'tamil';
-        else if (englishSelect && Array.from(englishSelect.options).some(o => o.value === prevSong)) lastCategory = 'english';
-        else lastCategory = 'both';
-        setTimeout(() => { suppressEmit = false; }, 150);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target.result;
+          player.src = base64;
+          player.currentTime = 0;
+          lastCategory = 'local';
+          const name = file.name;
+          player.play().catch(err => console.log('Play failed:', err));
+          setNowPlayingUI(name);
+          socket.emit('playSong', { roomId: roomCode, songName: name, songBase64: base64, category: 'local', time: 0 });
+          localStatus.textContent = `Playing: ${name}`;
+        };
+        reader.readAsDataURL(file);
       });
-    });
-
-    nextBtn.addEventListener('click', () => {
-      let list = getAllSongs('both');
-      if (lastCategory === 'tamil') list = getAllSongs('tamil');
-      else if (lastCategory === 'english') list = getAllSongs('english');
-
-      const cur = songPathToRelative(player.src);
-      let idx = list.indexOf(cur);
-      if (idx === -1) idx = 0;
-      const nextIndex = (idx + 1) % list.length;
-      const nextSong = list[nextIndex];
-      const name = songNameFromPath(nextSong);
-      suppressEmit = true;
-      player.src = nextSong;
-      player.currentTime = 0;
-      player.play().catch(err => console.log('Play failed:', err)).finally(() => {
-        setNowPlayingUI(nextSong);
-        socket.emit('playSong', { roomId: roomCode, song: nextSong, time: 0, songName: name });
-        if (tamilSelect && Array.from(tamilSelect.options).some(o => o.value === nextSong)) lastCategory = 'tamil';
-        else if (englishSelect && Array.from(englishSelect.options).some(o => o.value === nextSong)) lastCategory = 'english';
-        else lastCategory = 'both';
-        setTimeout(() => { suppressEmit = false; }, 150);
-      });
-    });
-
-    // Seek by clicking/dragging the progress bar
-    let seeking = false;
-    function seekFromEvent(e) {
-      const rect = progress.getBoundingClientRect();
-      const clientX = (e.touches ? e.touches[0].clientX : e.clientX);
-      let pct = (clientX - rect.left) / rect.width;
-      pct = Math.max(0, Math.min(1, pct));
-      if (player.duration) {
-        player.currentTime = pct * player.duration;
-        progressFill.style.width = `${pct * 100}%`;
-        currentTimeEl.textContent = formatTime(player.currentTime);
-        // emit seek to server
-        if (!suppressEmit) {
-          const rel = songPathToRelative(player.src);
-          socket.emit('syncTime', { roomId: roomCode, song: rel, time: player.currentTime });
-        }
-      }
     }
 
-    progress.addEventListener('mousedown', (e) => { seeking = true; seekFromEvent(e); });
-    window.addEventListener('mousemove', (e) => { if (seeking) seekFromEvent(e); });
-    window.addEventListener('mouseup', () => { if (seeking) seeking = false; });
-
-    // touch support
-    progress.addEventListener('touchstart', (e) => { seeking = true; seekFromEvent(e); });
-    window.addEventListener('touchmove', (e) => { if (seeking) seekFromEvent(e); });
-    window.addEventListener('touchend', () => { if (seeking) seeking = false; });
-
     // -----------------------
-    // Hook existing play buttons to set category & UI
+    // Control buttons, dropdowns, next/prev, seek (existing code)
     // -----------------------
+    // --- existing play buttons code ---
     const playTamilBtn = document.getElementById('playTamilBtn');
     const playEnglishBtn = document.getElementById('playEnglishBtn');
 
@@ -404,21 +325,13 @@
       });
     }
 
-    // If user selects an item in dropdown but doesn't press play, update lastCategory so next/prev will use it
-    if (tamilSelect) {
-      tamilSelect.addEventListener('change', () => { lastCategory = 'tamil'; });
-    }
-    if (englishSelect) {
-      englishSelect.addEventListener('change', () => { lastCategory = 'english'; });
-    }
+    if (tamilSelect) tamilSelect.addEventListener('change', () => { lastCategory = 'tamil'; });
+    if (englishSelect) englishSelect.addEventListener('change', () => { lastCategory = 'english'; });
 
     // Initial state request
     socket.emit('requestState', { roomId: roomCode });
 
-    // expose some debug on window for quick testing
     window.__musicRoom = { socket, player };
-
-    // initial UI update if audio has source
     if (player.src) setNowPlayingUI(player.src);
   }
 

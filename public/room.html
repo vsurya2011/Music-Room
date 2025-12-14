@@ -48,13 +48,43 @@
     <div>
       <h3 style="margin:0 0 8px;">🎵 Tamil Songs</h3>
       <select id="tamilSongs">
-        <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
-        <option value="songs/tamil/Asku_Laska.mp3">Asku Laska</option>
-        <option value="songs/tamil/Aathi.mp3">Aathi</option>
-        <option value="songs/tamil/America_Yendralum.mp3">America Yendralum</option>
+      <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
+<option value="songs/tamil/Asku_Laska.mp3">Asku Laska</option>
+<option value="songs/tamil/Aathi.mp3">Aathi</option>
+<option value="songs/tamil/America_Yendralum.mp3">America Yendralum</option>
 <option value="songs/tamil/Ammadi_Un_Azhagu.mp3">Ammadi Un Azhagu</option>
+<option value="songs/tamil/Aye_Aye_Aye.mp3">Aye Aye Aye</option>
 
+<option value="songs/tamil/Chellakuttiye.mp3">Chellakuttiye</option>
+<option value="songs/tamil/Darling_Dambakku.mp3">Darling Dambakku</option>
+<option value="songs/tamil/Irukkana_Idupu_Irukkana.mp3">Irukkana Idupu Irukkana</option>
+<option value="songs/tamil/Kaadhal_En_Kaviye.mp3">Kaadhal En Kaviye</option>
+<option value="songs/tamil/Kannadi_Poove.mp3">Kannadi Poove</option>
 
+<option value="songs/tamil/Karakudi_Ilavarasi.mp3">Karakudi Ilavarasi</option>
+<option value="songs/tamil/Katchi_Sera.mp3">Katchi Sera</option>
+<option value="songs/tamil/Kilimanjaro.mp3">Kilimanjaro</option>
+<option value="songs/tamil/Kuchi_Mittai.mp3">Kuchi Mittai</option>
+<option value="songs/tamil/Maattikkichey_Maattikkichey.mp3">Maattikkichey Maattikkichey</option>
+<option value="songs/tamil/Mudhal_Nee_Mudivum_Nee.mp3">Mudhal Nee Mudivum Nee</option>
+
+<option value="songs/tamil/Naanum_Rowdy_Dhaan.mp3">Naanum Rowdy Dhaan</option>
+<option value="songs/tamil/Nangaai.mp3">Nangaai</option>
+<option value="songs/tamil/Neeyum_Naanum_Anbe.mp3">Neeyum Naanum Anbe</option>
+<option value="songs/tamil/Oorum_Blood.mp3">Oorum Blood</option>
+<option value="songs/tamil/Oru_Kuchi_Oru_Kulfi.mp3">Oru Kuchi Oru Kulfi</option>
+
+<option value="songs/tamil/Otha_Sollaala.mp3">Otha Sollaala</option>
+<option value="songs/tamil/Pakkam_Vanthu.mp3">Pakkam Vanthu</option>
+<option value="songs/tamil/Po_Nee_Po.mp3">Po Nee Po</option>
+<option value="songs/tamil/Saitji_Saitji.mp3">Saitji Saitji</option>
+<option value="songs/tamil/Unna_Paartha.mp3">Unna Paartha</option>
+
+<option value="songs/tamil/Va_Va_Va_Vannila.mp3">Va Va Va Vannila</option>
+<option value="songs/tamil/Vaadi_Vaadi.mp3">Vaadi Vaadi</option>
+<option value="songs/tamil/What_a_Karavaad.mp3">What a Karavaad</option>
+<option value="songs/tamil/Yaen_Ennai_Pirindhaai.mp3">Yaen Ennai Pirindhaai</option>
+        
       </select>
       <button id="playTamilBtn">Play Tamil Song</button>
     </div>
@@ -62,7 +92,7 @@
     <div style="margin-top:10px;">
       <h3 style="margin:0 0 8px;">🎶 English Songs</h3>
       <select id="englishSongs">
-       <option value="songs/english/A_thousand_years.mp3">A thousand years</option>
+         <option value="songs/english/A_thousand_years.mp3">A thousand years</option>
 <option value="songs/english/Arcade.mp3">Arcade</option>
 <option value="songs/english/As_it_was.mp3">As it was</option>
 <option value="songs/english/Ashe_Moral_of_the_Story.mp3">Ashe Moral of the Story</option>
@@ -136,6 +166,14 @@
 
       </select>
       <button id="playEnglishBtn">Play English Song</button>
+    </div>
+
+    <!-- ====== New Local File Picker ====== -->
+    <div style="margin-top:10px;">
+      <h3 style="margin:0 0 8px;">📂 Choose Local Music</h3>
+      <input type="file" id="fileInput" accept="audio/*" style="width:100%; margin-bottom:6px;" />
+      <button id="playLocalBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#6c5ce7; color:#fff; cursor:pointer;">Play & Share</button>
+      <div id="localStatus" style="margin-top:6px; font-size:13px; color:#ffd700;"></div>
     </div>
 
     <audio id="player" controls></audio>
