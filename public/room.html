@@ -180,6 +180,14 @@
   <button id="playYTInternalBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#ff4757; color:#fff; cursor:pointer;">Play & Sync</button>
   <iframe id="ytPlayer" src="" allowfullscreen style="width:100%; height:250px; border-radius:12px; margin-top:10px; border:none;"></iframe>
 </div>
+<input id="ytInput" type="text" placeholder="Paste YouTube link or ID" style="width:100%; padding:8px; margin-bottom:6px;">
+<button id="loadBtn">Load & Sync</button>
+<div id="player"></div>
+<h3 id="nowPlaying">Now Playing: None</h3>
+
+<script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="script.js"></script>
 
 
     <audio id="player" controls>

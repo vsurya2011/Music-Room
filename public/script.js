@@ -549,5 +549,208 @@ socket.on("pauseSong", ({ type }) => {
     ytPlayer.contentWindow.postMessage(JSON.stringify({ event: "command", func: "pauseVideo" }), "*");
   }
 });
+const socket = io();
+const params = new URLSearchParams(window.location.search);
+const roomCode = params.get("room");
+document.getElementById("roomTitle").innerText = "Room Code: " + roomCode;
+
+let player;
+let isPlayerReady = false;
+let currentVideoId = null;
+
+// Extract only video ID
+function extractVideoId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtube.com")) return u.searchParams.get("v");
+    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
+  } catch(e) { return url; }
+  return url;
+}
+
+// YouTube API ready
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player("player", {
+    height: "360",
+    width: "640",
+    events: {
+      onReady: () => { isPlayerReady = true; },
+      onStateChange: onPlayerStateChange
+    }
+  });
+}
+
+// Auto-sync play/pause events
+function onPlayerStateChange(event) {
+  if (!isPlayerReady) return;
+  if (event.data === YT.PlayerState.PLAYING) {
+    socket.emit("play", { roomCode, time: player.getCurrentTime() });
+  }
+  if (event.data === YT.PlayerState.PAUSED) {
+    socket.emit("pause", { roomCode, time: player.getCurrentTime() });
+  }
+}
+
+// Join room
+socket.emit("join-room", roomCode);
+
+// Load video button
+document.getElementById("loadBtn").onclick = () => {
+  const input = document.getElementById("ytInput").value;
+  const videoId = extractVideoId(input);
+  if (!videoId) return alert("Invalid YouTube link!");
+  currentVideoId = videoId;
+  socket.emit("load-video", { roomCode, videoId });
+};
+
+// Listen for video load
+socket.on("load-video", videoId => {
+  currentVideoId = videoId;
+  if (isPlayerReady) {
+    player.loadVideoById(videoId);
+    document.getElementById("nowPlaying").innerText = "Now Playing: " + videoId;
+  }
+});
+
+// Listen for play
+socket.on("play", time => {
+  if (isPlayerReady && currentVideoId) {
+    player.seekTo(time, true);
+    player.playVideo();
+  }
+});
+
+// Listen for pause
+socket.on("pause", time => {
+  if (isPlayerReady && currentVideoId) {
+    player.seekTo(time, true);
+    player.pauseVideo();
+  }
+});
+
+// Late joiner: get current state
+socket.on("room-joined", ({ state }) => {
+  if (!state.videoId) return;
+  currentVideoId = state.videoId;
+  if (isPlayerReady) {
+    player.loadVideoById(currentVideoId, state.time);
+    if (state.isPlaying) player.playVideo();
+  }
+});
+const socket = io();
+const params = new URLSearchParams(window.location.search);
+const roomCode = params.get("room");
+document.getElementById("roomCode").innerText = roomCode;
+
+let audioPlayer = document.getElementById("audioPlayer");
+let localFile = null;
+
+// ---------------- YouTube ----------------
+let player;
+let isPlayerReady = false;
+let currentVideoId = null;
+
+function extractVideoId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtube.com")) return u.searchParams.get("v");
+    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
+  } catch(e) { return url; }
+  return url;
+}
+
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player("player", {
+    height: "360",
+    width: "100%",
+    events: {
+      onReady: () => { isPlayerReady = true; },
+      onStateChange: onPlayerStateChange
+    }
+  });
+}
+
+function onPlayerStateChange(event) {
+  if (!isPlayerReady) return;
+  if (event.data === YT.PlayerState.PLAYING) {
+    socket.emit("playSong", { type:"youtube", song:currentVideoId, songName:currentVideoId, time: player.getCurrentTime() });
+  }
+  if (event.data === YT.PlayerState.PAUSED) {
+    socket.emit("pauseSong", { type:"youtube", time: player.getCurrentTime() });
+  }
+}
+
+// ---------------- Join Room ----------------
+socket.emit("joinRoom", { roomId: roomCode, username: "Guest" });
+
+socket.on("updateUsers", users => {
+  const userSelect = document.getElementById("userSelect");
+  userSelect.innerHTML = "";
+  users.forEach(u => { let opt = document.createElement("option"); opt.text = u; userSelect.add(opt); });
+});
+
+// ---------------- Load YouTube ----------------
+document.getElementById("loadYTBtn").onclick = () => {
+  const input = document.getElementById("ytInput").value;
+  const videoId = extractVideoId(input);
+  if (!videoId) return alert("Invalid YouTube link!");
+  currentVideoId = videoId;
+  socket.emit("playSong", { type:"youtube", song:videoId, songName:videoId, time:0 });
+};
+
+socket.on("playSong", ({ type, song, songName, time }) => {
+  if (type==="youtube") {
+    currentVideoId = song;
+    if (isPlayerReady) {
+      player.loadVideoById(song);
+      player.seekTo(time, true);
+      player.playVideo();
+    }
+    document.getElementById("nowPlaying").innerText = "Now Playing: " + songName;
+  } else if (type==="audio" || type==="local") {
+    audioPlayer.src = song;
+    audioPlayer.currentTime = time;
+    audioPlayer.play();
+    document.getElementById("nowPlaying").innerText = "Now Playing: " + songName;
+  }
+});
+
+socket.on("pauseSong", ({ type, time }) => {
+  if (type==="youtube" && isPlayerReady) {
+    player.seekTo(time, true);
+    player.pauseVideo();
+  } else if (type==="audio" || type==="local") {
+    audioPlayer.currentTime = time;
+    audioPlayer.pause();
+  }
+});
+
+// ---------------- Play Tamil/English ----------------
+document.getElementById("playTamilBtn").onclick = () => {
+  const song = document.getElementById("tamilSongs").value;
+  socket.emit("playSong", { type:"audio", song, songName: song.split("/").pop(), time:0 });
+};
+document.getElementById("playEnglishBtn").onclick = () => {
+  const song = document.getElementById("englishSongs").value;
+  socket.emit("playSong", { type:"audio", song, songName: song.split("/").pop(), time:0 });
+};
+
+// ---------------- Local File ----------------
+document.getElementById("playLocalBtn").onclick = () => {
+  const fileInput = document.getElementById("fileInput");
+  if (!fileInput.files.length) return alert("Select a file!");
+  const file = fileInput.files[0];
+  const url = URL.createObjectURL(file);
+  localFile = url;
+  socket.emit("playSong", { type:"local", song:url, songName: file.name, time:0 });
+};
+
+// Sync local audio player play/pause
+audioPlayer.onplay = () => {
+  socket.emit("playSong", { type:"audio", song:audioPlayer.src, songName:audioPlayer.src.split("/").pop(), time: audioPlayer.currentTime });
+};
+audioPlayer.onpause = () => {
+  socket.emit("pauseSong", { type:"audio", time: audioPlayer.currentTime });
+};
 
 })();

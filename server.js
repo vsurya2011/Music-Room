@@ -59,6 +59,7 @@ const rooms = {};
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
+  // ------------------ Join Room ------------------
   socket.on("joinRoom", ({ roomId, username }) => {
     socket.join(roomId);
     socket.roomId = roomId;
@@ -72,7 +73,7 @@ io.on("connection", (socket) => {
         time: 0,
         playing: false,
         lastUpdate: null,
-        type: null // <-- added type to track youtube/audio/local
+        type: null // Track type: youtube/audio/local
       };
     }
 
@@ -82,7 +83,7 @@ io.on("connection", (socket) => {
 
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // Sync late joiners with current playback
+    // Sync late joiners
     const room = rooms[roomId];
     if (room.song && room.playing) {
       let currentTime = room.time;
