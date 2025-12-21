@@ -60,17 +60,14 @@
 <body>
   <h1>🎶 Play YouTube Song</h1>
 
-  <!-- Input inside yt.html -->
   <input id="ytLink" type="text" placeholder="Paste YouTube link or ID here" />
   <button id="playBtn">▶ Play</button>
 
-  <!-- YouTube iframe -->
   <iframe id="ytPlayer" src="" allowfullscreen></iframe>
 
   <script>
     function extractVideoID(url) {
       try {
-        // Check if it’s full URL
         const urlObj = new URL(url);
         if (urlObj.hostname.includes("youtube.com")) {
           return urlObj.searchParams.get("v");
@@ -79,7 +76,7 @@
           return urlObj.pathname.slice(1);
         }
       } catch(e) {
-        // Not a full URL, assume direct ID
+        // Not a URL, assume direct ID
         return url;
       }
       return url;
@@ -93,7 +90,6 @@
       }
       const videoID = extractVideoID(input);
       document.getElementById("ytPlayer").src = `https://www.youtube.com/embed/${videoID}?autoplay=1`;
-      // Scroll iframe into view for mobile
       document.getElementById("ytPlayer").scrollIntoView({behavior: "smooth"});
     };
   </script>

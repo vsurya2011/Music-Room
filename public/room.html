@@ -165,8 +165,15 @@
       </select>
       <button id="playEnglishBtn">Play English Song</button>
     </div>
-  <!-- Play YouTube Song Button -->
-  <button id="playYTBtn">▶ Play YouTube Song</button>
+ <button id="playYTBtn">▶ Play YouTube Song</button>
+
+<script>
+  document.getElementById("playYTBtn").onclick = () => {
+    // Make sure this matches your file name exactly (YT.html, not yt.html)
+    window.location.href = "YT.html";
+  };
+</script>
+
 
     <!-- ====== New Local File Picker ====== -->
     <div style="margin-top:10px;">

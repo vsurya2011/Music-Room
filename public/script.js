@@ -484,18 +484,18 @@ if (fileInput && playLocalBtn) {
     window.addEventListener('DOMContentLoaded', initRoom);
   }
 document.getElementById("playYTBtn").onclick = () => {
-  const ytLink = document.getElementById("ytLinkInput").value.trim();
-  if (!ytLink) return alert("Paste a YouTube link or video ID first");
+  const YTLink = document.getElementById("YTLinkInput").value.trim();
+  if (!YTLink) return alert("Paste a YouTube link or video ID first");
 
   // Save the link in session storage so yt.html can pick it up
-  sessionStorage.setItem("ytLink", ytLink);
+  sessionStorage.setItem("YTLink", YTLink);
 
   // Open yt.html page
-  window.location.href = "yt.html";
+  window.location.href = "YT.html";
 };
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("playYTBtn").onclick = () => {
-    window.location.href = "yt.html";
+    window.location.href = "YT.html";
   };
 });
 
