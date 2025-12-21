@@ -1,218 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>YT Music Room</title>
-
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Player</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Poppins', sans-serif;
-    }
-
     body {
-      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      font-family: Arial, sans-serif;
+      background: #121212;
       color: #fff;
-      padding: 15px;
-    }
-
-    .yt-container {
-      width: 100%;
-      max-width: 420px;
-      background: rgba(0,0,0,0.55);
-      border-radius: 18px;
-      padding: 18px;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-      backdrop-filter: blur(10px);
-    }
-
-    h2 {
-      text-align: center;
-      margin-bottom: 12px;
-      color: #ff4081;
-      font-weight: 700;
-    }
-
-    .top-actions {
       display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      margin: 0;
     }
 
-    .top-actions button {
-      flex: 1;
-      margin: 0 5px;
-      padding: 8px;
+    h1 {
+      text-align: center;
+    }
+
+    input, button {
+      padding: 10px;
+      margin: 10px 0;
       border-radius: 8px;
       border: none;
-      cursor: pointer;
-      font-weight: 600;
-      background: #ff4081;
-      color: #fff;
-    }
-
-    .top-actions button:hover {
-      background: #ff6fa3;
+      width: 100%;
+      max-width: 400px;
+      font-size: 16px;
     }
 
     input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: none;
-      outline: none;
-      margin: 10px 0;
-      font-size: 14px;
-      text-align: center;
+      background: #222;
+      color: #fff;
     }
 
-    .player-wrapper {
-      margin-top: 12px;
-      position: relative;
-      padding-top: 56.25%; /* 16:9 */
-      border-radius: 14px;
-      overflow: hidden;
-      background: #000;
-    }
-
-    #player {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    .controls {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 12px;
-    }
-
-    .controls button {
-      flex: 1;
-      margin: 0 5px;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      background: #1db954;
-      color: #000;
-      font-weight: 700;
+    button {
+      background: #ff4081;
+      color: #fff;
+      font-weight: 600;
       cursor: pointer;
+      transition: transform 0.2s;
     }
 
-    .controls button:hover {
-      background: #1ed760;
+    button:hover {
+      transform: scale(1.05);
     }
 
-    .pip-btn {
-      margin-top: 10px;
+    iframe {
       width: 100%;
-      padding: 10px;
-      border-radius: 10px;
+      max-width: 560px;
+      height: 315px;
+      margin-top: 20px;
+      border-radius: 12px;
       border: none;
-      background: #ffaa00;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    .pip-btn:hover {
-      background: #ffbe33;
-    }
-
-    @media (max-width: 480px) {
-      .yt-container {
-        max-width: 100%;
-      }
     }
   </style>
 </head>
-
 <body>
+  <h1>🎶 Play YouTube Song</h1>
 
-  <div class="yt-container">
-    <h2>🎶 YT Music Room</h2>
+  <!-- Input inside yt.html -->
+  <input id="ytLink" type="text" placeholder="Paste YouTube link or ID here" />
+  <button id="playBtn">▶ Play</button>
 
-    <!-- Top navigation -->
-    <div class="top-actions">
-      <button id="backBtn">⬅ Back</button>
-      <button id="pipToggle">🔳 Mini</button>
-    </div>
+  <!-- YouTube iframe -->
+  <iframe id="ytPlayer" src="" allowfullscreen></iframe>
 
-    <!-- Video URL input -->
-    <input type="text" id="ytInput" placeholder="Paste YouTube Link or Video ID" />
-
-    <!-- Player -->
-    <div class="player-wrapper">
-      <div id="player"></div>
-    </div>
-
-    <!-- Controls -->
-    <div class="controls">
-      <button onclick="playVideo()">▶ Play</button>
-      <button onclick="pauseVideo()">⏸ Pause</button>
-    </div>
-
-    <button class="pip-btn" id="pipBtn">🎧 Picture-in-Picture</button>
-  </div>
-
-  <!-- YT IFRAME API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
-
-  <!-- KEEP YOUR EXISTING LOGIC -->
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="script-yt.js"></script>
-
-  <!-- ADDITIONS ONLY (NO FUNCTION CHANGES) -->
   <script>
-    // Back to room
-    document.getElementById("backBtn").onclick = () => {
-      window.location.href = "room.html";
-    };
-
-    // Picture in Picture
-    document.getElementById("pipBtn").onclick = async () => {
-      const iframe = document.querySelector("iframe");
-// AUTO load link from room page
-window.addEventListener("DOMContentLoaded", () => {
-  const ytLink = sessionStorage.getItem("ytLink");
-  if (ytLink && ytLink !== "") {
-    loadVideo(ytLink); // <- your existing function to play YT video
-    sessionStorage.removeItem("ytLink");
-  }
-});
-
-      if (!iframe) return alert("Player not ready");
-
+    function extractVideoID(url) {
       try {
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        } else {
-          await iframe.requestPictureInPicture();
+        // Check if it’s full URL
+        const urlObj = new URL(url);
+        if (urlObj.hostname.includes("youtube.com")) {
+          return urlObj.searchParams.get("v");
         }
-      } catch (e) {
-        alert("Mini player not supported on this device");
+        if (urlObj.hostname.includes("youtu.be")) {
+          return urlObj.pathname.slice(1);
+        }
+      } catch(e) {
+        // Not a full URL, assume direct ID
+        return url;
       }
+      return url;
+    }
+
+    document.getElementById("playBtn").onclick = () => {
+      const input = document.getElementById("ytLink").value.trim();
+      if (!input) {
+        alert("Please enter a YouTube link or video ID!");
+        return;
+      }
+      const videoID = extractVideoID(input);
+      document.getElementById("ytPlayer").src = `https://www.youtube.com/embed/${videoID}?autoplay=1`;
+      // Scroll iframe into view for mobile
+      document.getElementById("ytPlayer").scrollIntoView({behavior: "smooth"});
     };
-
-    // Auto PiP when tab changes (desktop chrome)
-    document.addEventListener("visibilitychange", () => {
-      const iframe = document.querySelector("iframe");
-      if (document.hidden && iframe) {
-        iframe.requestPictureInPicture().catch(() => {});
-      }
-    });
   </script>
-
 </body>
 </html>

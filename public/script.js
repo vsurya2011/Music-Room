@@ -493,5 +493,11 @@ document.getElementById("playYTBtn").onclick = () => {
   // Open yt.html page
   window.location.href = "yt.html";
 };
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("playYTBtn").onclick = () => {
+    window.location.href = "yt.html";
+  };
+});
+
 
 })();
