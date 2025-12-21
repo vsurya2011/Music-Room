@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YT Music Room</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      padding: 15px;
+    }
+
+    .yt-container {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(0,0,0,0.55);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 12px;
+      color: #ff4081;
+      font-weight: 700;
+    }
+
+    .top-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .top-actions button {
+      flex: 1;
+      margin: 0 5px;
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      background: #ff4081;
+      color: #fff;
+    }
+
+    .top-actions button:hover {
+      background: #ff6fa3;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+      margin: 10px 0;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .player-wrapper {
+      margin-top: 12px;
+      position: relative;
+      padding-top: 56.25%; /* 16:9 */
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #player {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 12px;
+    }
+
+    .controls button {
+      flex: 1;
+      margin: 0 5px;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #1db954;
+      color: #000;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .controls button:hover {
+      background: #1ed760;
+    }
+
+    .pip-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #ffaa00;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .pip-btn:hover {
+      background: #ffbe33;
+    }
+
+    @media (max-width: 480px) {
+      .yt-container {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="yt-container">
+    <h2>🎶 YT Music Room</h2>
+
+    <!-- Top navigation -->
+    <div class="top-actions">
+      <button id="backBtn">⬅ Back</button>
+      <button id="pipToggle">🔳 Mini</button>
+    </div>
+
+    <!-- Video URL input -->
+    <input type="text" id="ytInput" placeholder="Paste YouTube Link or Video ID" />
+
+    <!-- Player -->
+    <div class="player-wrapper">
+      <div id="player"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button onclick="playVideo()">▶ Play</button>
+      <button onclick="pauseVideo()">⏸ Pause</button>
+    </div>
+
+    <button class="pip-btn" id="pipBtn">🎧 Picture-in-Picture</button>
+  </div>
+
+  <!-- YT IFRAME API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <!-- KEEP YOUR EXISTING LOGIC -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script-yt.js"></script>
+
+  <!-- ADDITIONS ONLY (NO FUNCTION CHANGES) -->
+  <script>
+    // Back to room
+    document.getElementById("backBtn").onclick = () => {
+      window.location.href = "room.html";
+    };
+
+    // Picture in Picture
+    document.getElementById("pipBtn").onclick = async () => {
+      const iframe = document.querySelector("iframe");
+// AUTO load link from room page
+window.addEventListener("DOMContentLoaded", () => {
+  const ytLink = sessionStorage.getItem("ytLink");
+  if (ytLink && ytLink !== "") {
+    loadVideo(ytLink); // <- your existing function to play YT video
+    sessionStorage.removeItem("ytLink");
+  }
+});
+
+      if (!iframe) return alert("Player not ready");
+
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await iframe.requestPictureInPicture();
+        }
+      } catch (e) {
+        alert("Mini player not supported on this device");
+      }
+    };
+
+    // Auto PiP when tab changes (desktop chrome)
+    document.addEventListener("visibilitychange", () => {
+      const iframe = document.querySelector("iframe");
+      if (document.hidden && iframe) {
+        iframe.requestPictureInPicture().catch(() => {});
+      }
+    });
+  </script>
+
+</body>
+</html>
