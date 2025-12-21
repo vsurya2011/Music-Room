@@ -71,7 +71,8 @@ io.on("connection", (socket) => {
         songName: null,
         time: 0,
         playing: false,
-        lastUpdate: null
+        lastUpdate: null,
+        type: null // <-- added type to track youtube/audio/local
       };
     }
 
@@ -80,39 +81,56 @@ io.on("connection", (socket) => {
     }
 
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
+
+    // Sync late joiners with current playback
+    const room = rooms[roomId];
+    if (room.song && room.playing) {
+      let currentTime = room.time;
+      if (room.lastUpdate) {
+        currentTime += (Date.now() - room.lastUpdate) / 1000;
+      }
+      socket.emit("playSong", {
+        type: room.type,
+        song: room.song,
+        songName: room.songName,
+        time: currentTime
+      });
+    }
   });
 
-  socket.on("playSong", ({ roomId, song, songName, time }) => {
-    const room = rooms[roomId];
-    if (!room) return;
+  // ------------------ Play Song ------------------
+  socket.on("playSong", ({ type, song, songName, time }) => {
+    const roomId = socket.roomId;
+    if (!roomId || !rooms[roomId]) return;
 
+    const room = rooms[roomId];
     room.song = song;
     room.songName = songName;
     room.time = time || 0;
     room.playing = true;
+    room.type = type;
     room.lastUpdate = Date.now();
 
-    io.to(roomId).emit("playSong", {
-      song,
-      songName,
-      time: room.time,
-      playing: true
-    });
+    io.to(roomId).emit("playSong", { type, song, songName, time: room.time });
   });
 
-  socket.on("pauseSong", ({ roomId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
+  // ------------------ Pause Song ------------------
+  socket.on("pauseSong", ({ type, time }) => {
+    const roomId = socket.roomId;
+    if (!roomId || !rooms[roomId]) return;
 
-    if (room.playing && room.lastUpdate) {
-      room.time += (Date.now() - room.lastUpdate) / 1000;
+    const room = rooms[roomId];
+    if ((type === "audio" || type === "youtube") && room.playing && room.lastUpdate) {
+      room.time += (Date.now() - room.lastUpdate)/1000;
     }
 
     room.playing = false;
     room.lastUpdate = null;
-    io.to(roomId).emit("pauseSong");
+
+    io.to(roomId).emit("pauseSong", { type, time });
   });
 
+  // ------------------ Disconnect ------------------
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;

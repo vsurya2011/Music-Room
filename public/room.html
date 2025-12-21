@@ -165,15 +165,6 @@
       </select>
       <button id="playEnglishBtn">Play English Song</button>
     </div>
- <button id="playYTBtn">▶ Play YouTube Song</button>
-
-<script>
-  document.getElementById("playYTBtn").onclick = () => {
-    // Make sure this matches your file name exactly (YT.html, not yt.html)
-    window.location.href = "YT.html";
-  };
-</script>
-
 
     <!-- ====== New Local File Picker ====== -->
     <div style="margin-top:10px;">
@@ -182,9 +173,19 @@
       <button id="playLocalBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#6c5ce7; color:#fff; cursor:pointer;">Play & Share</button>
       <div id="localStatus" style="margin-top:6px; font-size:13px; color:#ffd700;"></div>
     </div>
+<div style="margin-top:12px;">
+  <h3 style="margin:0 0 8px;">▶ Play YouTube Song</h3>
+  <input id="ytLink" type="text" placeholder="Paste YouTube link or ID here" 
+         style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:none; background:#222; color:#fff;" />
+  <button id="playYTInternalBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#ff4757; color:#fff; cursor:pointer;">Play & Sync</button>
+  <iframe id="ytPlayer" src="" allowfullscreen style="width:100%; height:250px; border-radius:12px; margin-top:10px; border:none;"></iframe>
+</div>
 
-    <audio id="player" controls></audio>
+
+    <audio id="player" controls>
+</audio>
   </div>
+
 
   <script src="script.js"></script>
 </body>

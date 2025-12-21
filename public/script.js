@@ -483,20 +483,90 @@ if (fileInput && playLocalBtn) {
   if (window.location.pathname.endsWith('room.html')) {
     window.addEventListener('DOMContentLoaded', initRoom);
   }
-document.getElementById("playYTBtn").onclick = () => {
-  const YTLink = document.getElementById("YTLinkInput").value.trim();
-  if (!YTLink) return alert("Paste a YouTube link or video ID first");
+const socket = io(); // already connected
 
-  // Save the link in session storage so yt.html can pick it up
-  sessionStorage.setItem("YTLink", YTLink);
+const ytInput = document.getElementById("ytLink");
+const ytBtn = document.getElementById("playYTInternalBtn");
+const ytPlayer = document.getElementById("ytPlayer");
+const audioPlayer = document.getElementById("player");
 
-  // Open yt.html page
-  window.location.href = "YT.html";
+let ytCurrentVideoID = null;
+
+// Helper: Extract YouTube ID
+function extractVideoID(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname.includes("youtube.com")) return urlObj.searchParams.get("v");
+    if (urlObj.hostname.includes("youtu.be")) return urlObj.pathname.slice(1);
+  } catch(e) {
+    return url; // direct ID
+  }
+  return url;
+}
+
+// --- Play YouTube ---
+ytBtn.onclick = () => {
+  const input = ytInput.value.trim();
+  if (!input) return alert("Enter YouTube link or ID!");
+
+  const videoID = extractVideoID(input);
+  ytCurrentVideoID = videoID;
+
+  // Broadcast to room
+  socket.emit("playSong", {
+    type: "youtube",
+    song: `https://www.youtube.com/embed/${videoID}?autoplay=1&enablejsapi=1`,
+    songName: `YouTube: ${videoID}`,
+    time: 0
+  });
 };
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("playYTBtn").onclick = () => {
-    window.location.href = "YT.html";
-  };
+
+// --- Listen for playSong from server ---
+socket.on("playSong", ({ type, song, songName, time }) => {
+  document.getElementById("nowPlaying").textContent = `🎶 Now Playing: ${songName}`;
+
+  if (type === "local" || type === "tamil" || type === "english") {
+    audioPlayer.src = song;
+    audioPlayer.currentTime = time || 0;
+    audioPlayer.play();
+  } else if (type === "youtube") {
+    // If same video, update time via postMessage
+    const videoID = song.split("/embed/")[1].split("?")[0];
+    if (ytCurrentVideoID === videoID) {
+      ytPlayer.contentWindow.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [time || 0, true] }), "*");
+      ytPlayer.contentWindow.postMessage(JSON.stringify({ event: "command", func: "playVideo" }), "*");
+    } else {
+      ytCurrentVideoID = videoID;
+      ytPlayer.src = song;
+    }
+  }
+});
+
+// --- Listen for pauseSong from server ---
+socket.on("pauseSong", ({ type, time }) => {
+  if (type === "audio") audioPlayer.pause();
+  if (type === "youtube" && ytCurrentVideoID) {
+    ytPlayer.contentWindow.postMessage(JSON.stringify({ event: "command", func: "pauseVideo" }), "*");
+  }
+});
+
+// --- Detect local audio events ---
+audioPlayer.onplay = () => {
+  socket.emit("playSong", {
+    type: "audio",
+    song: audioPlayer.src,
+    songName: audioPlayer.src.split("/").pop(),
+    time: audioPlayer.currentTime
+  });
+};
+
+audioPlayer.onpause = () => {
+  socket.emit("pauseSong", { type: "audio", time: audioPlayer.currentTime });
+};
+
+// --- Optional: Add YouTube iframe API listener ---
+window.addEventListener("message", (e) => {
+  // Can add sync for pause/play events from YouTube player if needed
 });
 
 
