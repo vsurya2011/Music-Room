@@ -114,10 +114,27 @@
     const player = document.getElementById('player');
     const roomCode = localStorage.getItem('roomId');
     const username = localStorage.getItem('username');
-
+ setupYTListeners(socket, roomCode);
 socket.on("playYT", ({ videoId, time = 0, playing = true }) => {
   playYT(videoId, time, playing);
 });
+function setupYTListeners(socket, roomCode) {
+  const playYTBtn = document.getElementById('playYTBtn');
+  const ytLinkInput = document.getElementById('ytLink');
+
+  if (playYTBtn) {
+    playYTBtn.onclick = () => {
+      const rawValue = ytLinkInput.value.trim();
+      if (!rawValue) {
+        alert("❌ Please paste a YouTube link or ID first!");
+        return;
+      }
+      const videoId = extractVideoId(rawValue);
+      socket.emit("playYT", { roomId: roomCode, videoId: videoId });
+    };
+  }
+}
+
 setInterval(() => {
   if (ytPlayer && ytPlaying && currentYTId) {
     socket.emit("updateYTTime", {
@@ -522,7 +539,11 @@ function setupYTListeners(socket, roomCode) {
   if (playYTBtn) {
     playYTBtn.onclick = () => {
       const rawValue = ytLinkInput.value.trim();
-      if (!rawValue) return;
+      if (!rawValue) {
+  alert("❌ Please paste a YouTube link or ID first!");
+  return;
+}
+
       const videoId = extractVideoId(rawValue);
       socket.emit("playYT", { roomId: roomCode, videoId: videoId });
     };
