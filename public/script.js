@@ -115,6 +115,19 @@
     const roomCode = localStorage.getItem('roomId');
     const username = localStorage.getItem('username');
 
+socket.on("playYT", ({ videoId, time = 0, playing = true }) => {
+  playYT(videoId, time, playing);
+});
+setInterval(() => {
+  if (ytPlayer && ytPlaying && currentYTId) {
+    socket.emit("updateYTTime", {
+      roomId: roomCode,
+      time: ytPlayer.getCurrentTime(),
+      playing: ytPlaying
+    });
+  }
+}, 1000);
+
     const roomCodeEl = document.getElementById('roomCode');
     if (roomCodeEl) roomCodeEl.innerText = roomCode || 'UNKNOWN';
     socket.emit('joinRoom', { roomId: roomCode, username });
@@ -491,72 +504,75 @@ if (fileInput && playLocalBtn) {
 // Keep everything as you already have
 
 // --- YouTube Player Integration ---
+// --- YouTube Player Integration ---
 let ytPlayer;
 let ytPlaying = false;
 let currentYTId = null;
 
-// Helper to get the ID from a full link (e.g., extracts '4Bsc2uI_LsM')
 function extractVideoId(url) {
   const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
   const match = url.match(regExp);
   return (match && match[7].length === 11) ? match[7] : url;
 }
 
-// 1. Handle clicking the "Play YouTube Song" button
-const playYTBtn = document.getElementById('playYTBtn');
-const ytLinkInput = document.getElementById('ytLink');
+function setupYTListeners(socket, roomCode) {
+  const playYTBtn = document.getElementById('playYTBtn');
+  const ytLinkInput = document.getElementById('ytLink');
 
-if (playYTBtn) {
-  playYTBtn.addEventListener('click', () => {
-    const rawValue = ytLinkInput.value.trim();
-    if (!rawValue) return;
-
-    const videoId = extractVideoId(rawValue);
-    const roomCode = localStorage.getItem('roomId'); // Get current room
-    
-    // Broadcast to server so EVERYONE plays it
-    socket.emit("playYT", { roomId: roomCode, videoId: videoId });
-  });
+  if (playYTBtn) {
+    playYTBtn.onclick = () => {
+      const rawValue = ytLinkInput.value.trim();
+      if (!rawValue) return;
+      const videoId = extractVideoId(rawValue);
+      socket.emit("playYT", { roomId: roomCode, videoId: videoId });
+    };
+  }
 }
 
-// 2. Global function called when YouTube API is ready
+const tag = document.createElement("script");
+tag.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(tag);
+
 window.onYouTubeIframeAPIReady = function() {
   ytPlayer = new YT.Player("ytPlayer", {
     height: "240",
     width: "100%",
     videoId: "",
-    playerVars: { 
-      autoplay: 1, 
-      modestbranding: 1, 
-      controls: 1 
-    },
+    playerVars: { autoplay: 1, modestbranding: 1, controls: 1 },
     events: {
       onStateChange: (event) => {
-        if (event.data === YT.PlayerState.PLAYING) ytPlaying = true;
-        else if (event.data === YT.PlayerState.PAUSED) ytPlaying = false;
+        const btn = document.getElementById('playPauseBtn');
+        if (event.data === YT.PlayerState.PLAYING) {
+          ytPlaying = true;
+          if(btn) btn.innerHTML = "❚❚";
+        } else if (event.data === YT.PlayerState.PAUSED) {
+          ytPlaying = false;
+          if(btn) btn.innerHTML = "►";
+        }
       }
-    }
+    },
   });
 };
 
-// 3. Logic to actually load the video on your screen
-function playYT(videoId) {
+function playYT(videoId, startTime = 0, autoplay = true) {
   if (!ytPlayer || !ytPlayer.loadVideoById) return;
-  
-  // Pause the local MP3 player if it's running
-  const localPlayer = document.getElementById('player');
-  localPlayer.pause();
-  
-  currentYTId = videoId;
-  ytPlayer.loadVideoById(videoId);
-  
-  // Update the custom UI text
-  const trackTitleEl = document.getElementById('trackTitle');
-  if (trackTitleEl) trackTitleEl.textContent = "YouTube: " + videoId;
-}
 
-// 4. Socket Listener: This makes it sync for every user in the room
-socket.on("playYT", (data) => {
-  console.log("Playing synced YouTube video:", data.videoId);
-  playYT(data.videoId);
-});
+  // pause local audio
+  const localPlayer = document.getElementById('player');
+  if (localPlayer) localPlayer.pause();
+
+  currentYTId = videoId;
+  ytPlayer.loadVideoById({
+    videoId: videoId,
+    startSeconds: startTime,
+  });
+
+  if (!autoplay) ytPlayer.pauseVideo();
+  else ytPlayer.playVideo();
+
+  // update UI
+  const trackTitleEl = document.getElementById('trackTitle');
+  const playPauseBtn = document.getElementById('playPauseBtn');
+  if (trackTitleEl) trackTitleEl.textContent = "🎬 YouTube: " + videoId;
+  if (playPauseBtn) playPauseBtn.innerHTML = autoplay ? "❚❚" : "►";
+}
