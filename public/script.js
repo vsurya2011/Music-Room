@@ -227,6 +227,44 @@
         socket.emit("playYT", { roomId: roomCode, videoId });
       };
     }
+// --- Picture-in-Picture (Mini Player) Logic ---
+const pipBtn = document.getElementById('pipBtn');
+
+if (pipBtn) {
+  pipBtn.addEventListener('click', async () => {
+    try {
+      // Find the actual video element inside the YouTube iframe
+      // Note: Some browsers block direct access, so we target the iframe container
+      const ytIframe = document.querySelector('#ytPlayer');
+      
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        pipBtn.textContent = "📺 Open Mini Player (PiP)";
+      } else {
+        if (document.pictureInPictureEnabled) {
+          // This requests the browser to pop out the video
+          await ytIframe.requestPictureInPicture();
+          pipBtn.textContent = "❌ Close Mini Player";
+        } else {
+          alert("Your browser doesn't support Mini Player mode.");
+        }
+      }
+    } catch (error) {
+      console.error("PiP Error:", error);
+      alert("To use Mini Player: Start the video first, then click this button!");
+    }
+  });
+}
+
+// Auto-PiP when switching tabs (Works on some mobile browsers)
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && ytPlaying) {
+    const ytIframe = document.querySelector('#ytPlayer');
+    if (ytIframe && document.pictureInPictureEnabled) {
+       ytIframe.requestPictureInPicture().catch(() => {});
+    }
+  }
+});
 
     // -----------------------
     // Local & playlist socket events
