@@ -484,3 +484,78 @@ if (fileInput && playLocalBtn) {
     window.addEventListener('DOMContentLoaded', initRoom);
   }
 })();
+// -----------------------
+// Your existing script.js code here
+// -----------------------
+// All your current custom player, socket.io logic, local/english/tamil song handling
+// Keep everything as you already have
+
+// ---------------- YouTube Integration ----------------
+let ytPlayer = null;
+
+function loadYouTubeAPI(callback) {
+  if (window.YT) return callback();
+  const tag = document.createElement('script');
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.body.appendChild(tag);
+  window.onYouTubeIframeAPIReady = callback;
+}
+
+document.getElementById('playYTBtn').addEventListener('click', () => {
+  const url = document.getElementById('ytLink').value.trim();
+  if (!url) return alert('Enter YouTube URL or ID');
+
+  let videoId = url;
+  try {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const u = new URL(url);
+      videoId = u.searchParams.get('v') || u.pathname.split('/').pop();
+    }
+  } catch {}
+
+  loadYouTubeAPI(() => {
+    if (!ytPlayer) {
+      ytPlayer = new YT.Player('ytPlayer', {
+        height: '180',
+        width: '100%',
+        videoId: videoId,
+        playerVars: { autoplay: 1, controls: 1 },
+      });
+    } else {
+      ytPlayer.loadVideoById(videoId);
+    }
+
+    // Pause your existing audio player if playing
+    const audioPlayer = document.getElementById('player');
+    if (!audioPlayer.paused) audioPlayer.pause();
+
+    // Update now playing text
+    const nowPlayingEl = document.getElementById('nowPlaying');
+    if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: YouTube Video`;
+
+    // Send to room via socket
+    socket.emit('playYT', { roomId: localStorage.getItem('roomId'), videoId });
+  });
+});
+
+// Receive YouTube sync from others
+socket.on('playYT', data => {
+  const videoId = data.videoId;
+  loadYouTubeAPI(() => {
+    if (!ytPlayer) {
+      ytPlayer = new YT.Player('ytPlayer', {
+        height: '180',
+        width: '100%',
+        videoId: videoId,
+        playerVars: { autoplay: 1, controls: 1 },
+      });
+    } else ytPlayer.loadVideoById(videoId);
+
+    const audioPlayer = document.getElementById('player');
+    if (!audioPlayer.paused) audioPlayer.pause();
+
+    const nowPlayingEl = document.getElementById('nowPlaying');
+    if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: YouTube Video`;
+  });
+});
+

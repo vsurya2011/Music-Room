@@ -32,6 +32,7 @@
     button { width:100%; padding:10px; margin-bottom:12px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:15px; font-weight:500; cursor:pointer; transition:0.2s;}
     button:hover { background:#ff4757; }
     audio { width:100%; margin-top:12px; border-radius:8px; outline:none; background:rgba(255,255,255,0.04); padding:6px;}
+    input[type=text] { width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:none; font-size:15px; }
     @media (max-width:450px) { .container{width:95%; padding:16px;} }
   </style>
 </head>
@@ -45,10 +46,11 @@
 
     <hr style="margin:12px 0 14px; border:none; height:1px; background:rgba(255,255,255,0.06)">
 
+    <!-- Tamil Songs -->
     <div>
       <h3 style="margin:0 0 8px;">🎵 Tamil Songs</h3>
       <select id="tamilSongs">
-      <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
+        <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
 <option value="songs/tamil/Asku_Laska.mp3">Asku Laska</option>
 <option value="songs/tamil/Aathi.mp3">Aathi</option>
 <option value="songs/tamil/America_Yendralum.mp3">America Yendralum</option>
@@ -84,15 +86,16 @@
 <option value="songs/tamil/Vaadi_Vaadi.mp3">Vaadi Vaadi</option>
 <option value="songs/tamil/What_a_Karavaad.mp3">What a Karavaad</option>
 <option value="songs/tamil/Yaen_Ennai_Pirindhaai.mp3">Yaen Ennai Pirindhaai</option>
-        
+
       </select>
       <button id="playTamilBtn">Play Tamil Song</button>
     </div>
 
+    <!-- English Songs -->
     <div style="margin-top:10px;">
       <h3 style="margin:0 0 8px;">🎶 English Songs</h3>
       <select id="englishSongs">
-         <option value="songs/english/A_thousand_years.mp3">A thousand years</option>
+        <option value="songs/english/A_thousand_years.mp3">A thousand years</option>
 <option value="songs/english/Arcade.mp3">Arcade</option>
 <option value="songs/english/As_it_was.mp3">As it was</option>
 <option value="songs/english/Ashe_Moral_of_the_Story.mp3">Ashe Moral of the Story</option>
@@ -161,17 +164,26 @@
 <option value="songs/english/Worlds_smallest_violin.mp3">World’s smallest violin</option>
 <option value="songs/english/Worth_it.mp3">Worth it</option>
 
-
       </select>
       <button id="playEnglishBtn">Play English Song</button>
     </div>
 
-    <!-- ====== New Local File Picker ====== -->
+    <!-- Local Music Picker -->
     <div style="margin-top:10px;">
       <h3 style="margin:0 0 8px;">📂 Choose Local Music</h3>
       <input type="file" id="fileInput" accept="audio/*" style="width:100%; margin-bottom:6px;" />
       <button id="playLocalBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#6c5ce7; color:#fff; cursor:pointer;">Play & Share</button>
       <div id="localStatus" style="margin-top:6px; font-size:13px; color:#ffd700;"></div>
+    </div>
+
+    <!-- YouTube Player Integration -->
+    <div style="margin-top:10px;">
+      <h3 style="margin:0 0 8px;">▶️ Play YouTube Song</h3>
+      <input type="text" id="ytLink" placeholder="Paste YouTube link or ID" />
+      <button id="playYTBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#00b894; color:#fff; cursor:pointer;">Play YouTube Song</button>
+      <div id="ytPlayerContainer" style="margin-top:8px;">
+        <div id="ytPlayer"></div>
+      </div>
     </div>
 
     <audio id="player" controls></audio>
