@@ -71,7 +71,7 @@ io.on("connection", (socket) => {
         song: null,
         songName: null,
         ytVideoId: null,
-        time: 0,
+        time: 0, // Tracked time for both local and YT
         playing: false,
         lastUpdate: null
       };
@@ -94,7 +94,12 @@ io.on("connection", (socket) => {
         playing: room.playing
       });
     } else if (room.ytVideoId) {
-      socket.emit("playYT", { videoId: room.ytVideoId });
+      // Added time and playing state to YT join logic
+      socket.emit("playYT", { 
+        videoId: room.ytVideoId, 
+        time: room.time, 
+        playing: room.playing 
+      });
     }
   });
 
@@ -134,26 +139,32 @@ io.on("connection", (socket) => {
   socket.on("syncTime", ({ roomId, song, time }) => {
     const room = rooms[roomId];
     if (!room) return;
-    if (room.song === song) {
-      room.time = time;
-      room.lastUpdate = Date.now();
-      socket.to(roomId).emit("syncTime", { song, time });
-    }
+    
+    // Sync time for either local song or YouTube
+    room.time = time;
+    room.lastUpdate = Date.now();
+    socket.to(roomId).emit("syncTime", { song, time });
   });
 
- // -------------------- YouTube events
-socket.on("playYT", ({ roomId, videoId }) => {
-  const room = rooms[roomId];
-  if (!room) return;
+  // -------------------- YouTube events
+  socket.on("playYT", ({ roomId, videoId, time }) => {
+    const room = rooms[roomId];
+    if (!room) return;
 
-  room.song = null;      // stop any local audio state
-  room.songName = null;
-  room.ytVideoId = videoId;
-  room.playing = true;
+    room.song = null;
+    room.songName = null;
+    room.ytVideoId = videoId;
+    room.playing = true;
+    // Store the time so resumes don't start from zero
+    room.time = time || room.time || 0; 
+    room.lastUpdate = Date.now();
 
-  // Use io.to(roomId).emit to send to EVERYONE in the room
-  io.to(roomId).emit("playYT", { videoId });
-});
+    io.to(roomId).emit("playYT", { 
+      videoId, 
+      time: room.time, 
+      playing: true 
+    });
+  });
 
   // -------------------- Disconnect
   socket.on("disconnect", () => {
