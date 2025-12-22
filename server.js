@@ -69,6 +69,7 @@ io.on("connection", (socket) => {
         users: [],
         song: null,
         songName: null,
+        ytVideoId: null,
         time: 0,
         playing: false,
         lastUpdate: null
@@ -79,15 +80,31 @@ io.on("connection", (socket) => {
       rooms[roomId].users.push(socket.username);
     }
 
+    // Send updated users list
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
+
+    // Send current room state to the newly joined user
+    const room = rooms[roomId];
+    if (room.song) {
+      socket.emit("playSong", {
+        song: room.song,
+        songName: room.songName,
+        time: room.time,
+        playing: room.playing
+      });
+    } else if (room.ytVideoId) {
+      socket.emit("playYT", { videoId: room.ytVideoId });
+    }
   });
 
+  // -------------------- Local song events
   socket.on("playSong", ({ roomId, song, songName, time }) => {
     const room = rooms[roomId];
     if (!room) return;
 
     room.song = song;
     room.songName = songName;
+    room.ytVideoId = null; // clear any YT song
     room.time = time || 0;
     room.playing = true;
     room.lastUpdate = Date.now();
@@ -113,6 +130,21 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("pauseSong");
   });
 
+  // -------------------- YouTube events
+  socket.on("playYT", ({ roomId, videoId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    // Clear any local song
+    room.song = null;
+    room.songName = null;
+    room.ytVideoId = videoId;
+    room.playing = true;
+
+    io.to(roomId).emit("playYT", { videoId });
+  });
+
+  // -------------------- Disconnect
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
@@ -120,6 +152,7 @@ io.on("connection", (socket) => {
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
+    // If room empty, clean uploads & remove room
     if (rooms[roomId].users.length === 0) {
       const room = rooms[roomId];
 
@@ -134,8 +167,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// --------------------
-// Server start
+// -------------------- Server start
 // --------------------
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
