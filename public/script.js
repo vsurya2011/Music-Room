@@ -227,44 +227,6 @@
         socket.emit("playYT", { roomId: roomCode, videoId });
       };
     }
-// --- Picture-in-Picture (Mini Player) Logic ---
-const pipBtn = document.getElementById('pipBtn');
-
-if (pipBtn) {
-  pipBtn.addEventListener('click', async () => {
-    try {
-      // Find the actual video element inside the YouTube iframe
-      // Note: Some browsers block direct access, so we target the iframe container
-      const ytIframe = document.querySelector('#ytPlayer');
-      
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-        pipBtn.textContent = "📺 Open Mini Player (PiP)";
-      } else {
-        if (document.pictureInPictureEnabled) {
-          // This requests the browser to pop out the video
-          await ytIframe.requestPictureInPicture();
-          pipBtn.textContent = "❌ Close Mini Player";
-        } else {
-          alert("Your browser doesn't support Mini Player mode.");
-        }
-      }
-    } catch (error) {
-      console.error("PiP Error:", error);
-      alert("To use Mini Player: Start the video first, then click this button!");
-    }
-  });
-}
-
-// Auto-PiP when switching tabs (Works on some mobile browsers)
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden" && ytPlaying) {
-    const ytIframe = document.querySelector('#ytPlayer');
-    if (ytIframe && document.pictureInPictureEnabled) {
-       ytIframe.requestPictureInPicture().catch(() => {});
-    }
-  }
-});
 
     // -----------------------
     // Local & playlist socket events
@@ -445,3 +407,30 @@ document.addEventListener("visibilitychange", () => {
       socket.emit('playSong', { roomId: roomCode, song, time:0, songName:songNameFromPath(song) });
       setNowPlayingUI(song);
     });
+
+    // Local file
+    if (playLocalBtn && fileInput) {
+      playLocalBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) { localStatus.textContent = "❌ Please choose a song first"; return; }
+        localStatus.textContent = "⏳ Uploading & sharing...";
+        const formData = new FormData(); formData.append("song", file);
+        try {
+          const res = await fetch("/upload",{method:"POST",body:formData});
+          const data = await res.json();
+          if (!data.url) throw new Error("Upload failed");
+          const songUrl = data.url;
+          currentYTId = null;
+          suppressEmit=true; player.src=songUrl; player.currentTime=0; await player.play();
+          setNowPlayingUI(songUrl);
+          socket.emit("playSong",{roomId: roomCode, song:songUrl, time:0, songName:file.name});
+          localStatus.textContent="✅ Playing & shared"; suppressEmit=false;
+        } catch(err){console.error(err); localStatus.textContent="❌ Failed to upload/play";}
+      });
+    }
+
+    socket.emit('requestState', { roomId: roomCode });
+  }
+
+  if (window.location.pathname.endsWith('room.html')) window.addEventListener('DOMContentLoaded', initRoom);
+})();
