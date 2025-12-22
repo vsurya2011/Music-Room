@@ -141,18 +141,19 @@ io.on("connection", (socket) => {
     }
   });
 
-  // -------------------- YouTube events
-  socket.on("playYT", ({ roomId, videoId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
+ // -------------------- YouTube events
+socket.on("playYT", ({ roomId, videoId }) => {
+  const room = rooms[roomId];
+  if (!room) return;
 
-    room.song = null;      // stop any local audio
-    room.songName = null;
-    room.ytVideoId = videoId;
-    room.playing = true;
+  room.song = null;      // stop any local audio state
+  room.songName = null;
+  room.ytVideoId = videoId;
+  room.playing = true;
 
-    io.to(roomId).emit("playYT", { videoId });
-  });
+  // Use io.to(roomId).emit to send to EVERYONE in the room
+  io.to(roomId).emit("playYT", { videoId });
+});
 
   // -------------------- Disconnect
   socket.on("disconnect", () => {
