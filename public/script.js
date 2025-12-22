@@ -490,72 +490,71 @@ if (fileInput && playLocalBtn) {
 // All your current custom player, socket.io logic, local/english/tamil song handling
 // Keep everything as you already have
 
-// ---------------- YouTube Integration ----------------
-let ytPlayer = null;
+// --- YouTube Player Integration ---
+let ytPlayer;
+let ytPlaying = false;
+let currentYTId = null;
 
-function loadYouTubeAPI(callback) {
-  if (window.YT) return callback();
-  const tag = document.createElement('script');
-  tag.src = "https://www.youtube.com/iframe_api";
-  document.body.appendChild(tag);
-  window.onYouTubeIframeAPIReady = callback;
+// Load YT API
+const tag = document.createElement("script");
+tag.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(tag);
+
+function onYouTubeIframeAPIReady() {
+  ytPlayer = new YT.Player("ytPlayer", {
+    height: "315",
+    width: "100%",
+    videoId: "",
+    playerVars: {
+      modestbranding: 1,
+      controls: 0,
+      rel: 0,
+    },
+    events: {
+      onStateChange: onYTStateChange,
+      onReady: () => {
+        if (currentYTId) playYT(currentYTId);
+      },
+    },
+  });
 }
 
-document.getElementById('playYTBtn').addEventListener('click', () => {
-  const url = document.getElementById('ytLink').value.trim();
-  if (!url) return alert('Enter YouTube URL or ID');
+function playYT(videoId) {
+  if (!ytPlayer) return;
+  currentYTId = videoId;
+  ytPlayer.loadVideoById(videoId);
+  ytPlayer.playVideo();
+  ytPlaying = true;
 
-  let videoId = url;
-  try {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const u = new URL(url);
-      videoId = u.searchParams.get('v') || u.pathname.split('/').pop();
-    }
-  } catch {}
+  // Update custom UI
+  trackTitleEl.textContent = "🎬 YouTube: " + videoId;
+  playPauseBtn.innerHTML = "❚❚";
+}
 
-  loadYouTubeAPI(() => {
-    if (!ytPlayer) {
-      ytPlayer = new YT.Player('ytPlayer', {
-        height: '180',
-        width: '100%',
-        videoId: videoId,
-        playerVars: { autoplay: 1, controls: 1 },
-      });
-    } else {
-      ytPlayer.loadVideoById(videoId);
-    }
-
-    // Pause your existing audio player if playing
-    const audioPlayer = document.getElementById('player');
-    if (!audioPlayer.paused) audioPlayer.pause();
-
-    // Update now playing text
-    const nowPlayingEl = document.getElementById('nowPlaying');
-    if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: YouTube Video`;
-
-    // Send to room via socket
-    socket.emit('playYT', { roomId: localStorage.getItem('roomId'), videoId });
-  });
+// Handle play/pause button
+playPauseBtn.addEventListener("click", () => {
+  if (ytPlaying) {
+    ytPlayer.pauseVideo();
+    playPauseBtn.innerHTML = "►";
+    ytPlaying = false;
+  } else if (currentYTId) {
+    ytPlayer.playVideo();
+    playPauseBtn.innerHTML = "❚❚";
+    ytPlaying = true;
+  } else {
+    // fallback: play selected audio
+    if (player.src) player.play();
+  }
 });
 
-// Receive YouTube sync from others
-socket.on('playYT', data => {
-  const videoId = data.videoId;
-  loadYouTubeAPI(() => {
-    if (!ytPlayer) {
-      ytPlayer = new YT.Player('ytPlayer', {
-        height: '180',
-        width: '100%',
-        videoId: videoId,
-        playerVars: { autoplay: 1, controls: 1 },
-      });
-    } else ytPlayer.loadVideoById(videoId);
+function onYTStateChange(event) {
+  if (event.data === YT.PlayerState.PAUSED) ytPlaying = false;
+  else if (event.data === YT.PlayerState.PLAYING) ytPlaying = true;
+}
 
-    const audioPlayer = document.getElementById('player');
-    if (!audioPlayer.paused) audioPlayer.pause();
-
-    const nowPlayingEl = document.getElementById('nowPlaying');
-    if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: YouTube Video`;
-  });
+// --- Socket.io listener ---
+socket.on("playYT", ({ videoId }) => {
+  // stop audio if playing
+  if (!player.paused) player.pause();
+  playYT(videoId);
 });
-
