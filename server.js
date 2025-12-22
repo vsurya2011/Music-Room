@@ -32,6 +32,9 @@ const upload = multer({ storage });
 
 app.use("/uploads", express.static(uploadsDir));
 
+// --------------------
+// Routes
+// --------------------
 app.post("/upload", upload.single("song"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
   res.json({
@@ -40,9 +43,6 @@ app.post("/upload", upload.single("song"), (req, res) => {
   });
 });
 
-// --------------------
-// Routes
-// --------------------
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
@@ -59,6 +59,7 @@ const rooms = {};
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
+  // -------------------- Join Room
   socket.on("joinRoom", ({ roomId, username }) => {
     socket.join(roomId);
     socket.roomId = roomId;
@@ -130,13 +131,22 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("pauseSong");
   });
 
+  socket.on("syncTime", ({ roomId, song, time }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    if (room.song === song) {
+      room.time = time;
+      room.lastUpdate = Date.now();
+      socket.to(roomId).emit("syncTime", { song, time });
+    }
+  });
+
   // -------------------- YouTube events
   socket.on("playYT", ({ roomId, videoId }) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    // Clear any local song
-    room.song = null;
+    room.song = null;      // stop any local audio
     room.songName = null;
     room.ytVideoId = videoId;
     room.playing = true;
@@ -155,12 +165,10 @@ io.on("connection", (socket) => {
     // If room empty, clean uploads & remove room
     if (rooms[roomId].users.length === 0) {
       const room = rooms[roomId];
-
       if (room.song && room.song.startsWith("/uploads/")) {
         const filePath = path.resolve(__dirname, "." + room.song);
         fs.unlink(filePath, () => {});
       }
-
       delete rooms[roomId];
       console.log("🧹 Room cleaned:", roomId);
     }
@@ -168,7 +176,6 @@ io.on("connection", (socket) => {
 });
 
 // -------------------- Server start
-// --------------------
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
