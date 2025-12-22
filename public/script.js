@@ -445,30 +445,3 @@ document.addEventListener("visibilitychange", () => {
       socket.emit('playSong', { roomId: roomCode, song, time:0, songName:songNameFromPath(song) });
       setNowPlayingUI(song);
     });
-
-    // Local file
-    if (playLocalBtn && fileInput) {
-      playLocalBtn.addEventListener('click', async () => {
-        const file = fileInput.files[0];
-        if (!file) { localStatus.textContent = "❌ Please choose a song first"; return; }
-        localStatus.textContent = "⏳ Uploading & sharing...";
-        const formData = new FormData(); formData.append("song", file);
-        try {
-          const res = await fetch("/upload",{method:"POST",body:formData});
-          const data = await res.json();
-          if (!data.url) throw new Error("Upload failed");
-          const songUrl = data.url;
-          currentYTId = null;
-          suppressEmit=true; player.src=songUrl; player.currentTime=0; await player.play();
-          setNowPlayingUI(songUrl);
-          socket.emit("playSong",{roomId: roomCode, song:songUrl, time:0, songName:file.name});
-          localStatus.textContent="✅ Playing & shared"; suppressEmit=false;
-        } catch(err){console.error(err); localStatus.textContent="❌ Failed to upload/play";}
-      });
-    }
-
-    socket.emit('requestState', { roomId: roomCode });
-  }
-
-  if (window.location.pathname.endsWith('room.html')) window.addEventListener('DOMContentLoaded', initRoom);
-})();
