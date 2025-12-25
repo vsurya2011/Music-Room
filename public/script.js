@@ -92,7 +92,13 @@
       height: "240",
       width: "100%",
       videoId: "",
-      playerVars: { autoplay: 1, modestbranding: 1, controls: 1, playsinline: 1 },
+      playerVars: { 
+        autoplay: 1, 
+        modestbranding: 1, 
+        controls: 1, 
+        playsinline: 1,
+        rel: 1 // ✅ Allows next video suggestions
+      },
       events: {
         onStateChange: (event) => {
           const playPauseBtn = document.getElementById('playPauseBtn');
@@ -102,14 +108,12 @@
           if (event.data === YT.PlayerState.PLAYING) {
             ytPlaying = true;
             if(playPauseBtn) playPauseBtn.innerHTML = "❚❚";
-            // Sync play state to others
             if (!suppressYTEmit && socket) {
               socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
             }
           } else if (event.data === YT.PlayerState.PAUSED) {
             ytPlaying = false;
             if(playPauseBtn) playPauseBtn.innerHTML = "►";
-            // Sync pause state to others
             if (!suppressYTEmit && socket) {
               socket.emit("pauseSong", { roomId: roomCode });
             }
@@ -125,26 +129,47 @@
     return (match && match[7].length === 11) ? match[7] : url;
   }
 
-  // FIXED: Improved PlayYT to prevent resetting to 0:00
-  function playYT(videoId, startTime = 0, autoplay = true) {
-    if (!ytPlayer || !ytPlayer.loadVideoById) return;
+  // ✅ New helper to detect Playlist ID
+  function extractPlaylistId(url) {
+    try {
+      const u = new URL(url);
+      return u.searchParams.get("list");
+    } catch {
+      return null;
+    }
+  }
+
+  // UPDATED: Added Playlist support in playYT
+  function playYT(videoId, startTime = 0, autoplay = true, playlistId = null) {
+    if (!ytPlayer) return;
     
     const localPlayer = document.getElementById('player');
     if (localPlayer) localPlayer.pause();
     
     suppressYTEmit = true;
     
-    // Check if the video is already loaded to avoid reload flicker/reset
-    let alreadyLoaded = false;
-    if (ytPlayer.getVideoData && ytPlayer.getVideoData().video_id === videoId) {
-        alreadyLoaded = true;
-    }
-
-    if (!alreadyLoaded) {
-        currentYTId = videoId;
-        ytPlayer.loadVideoById({ videoId, startSeconds: startTime });
+    if (playlistId) {
+      // ✅ Handle Playlist logic
+      ytPlayer.loadPlaylist({
+        listType: "playlist",
+        list: playlistId,
+        index: 0,
+        startSeconds: startTime
+      });
+      currentYTId = "PLAYLIST_ACTIVE"; 
     } else {
-        ytPlayer.seekTo(startTime, true);
+      // Handle Single Video
+      let alreadyLoaded = false;
+      if (ytPlayer.getVideoData && ytPlayer.getVideoData().video_id === videoId) {
+          alreadyLoaded = true;
+      }
+
+      if (!alreadyLoaded) {
+          currentYTId = videoId;
+          ytPlayer.loadVideoById({ videoId, startSeconds: startTime });
+      } else {
+          ytPlayer.seekTo(startTime, true);
+      }
     }
 
     if (!autoplay) ytPlayer.pauseVideo();
@@ -152,7 +177,7 @@
 
     const trackTitleEl = document.getElementById('trackTitle');
     const playPauseBtn = document.getElementById('playPauseBtn');
-    if (trackTitleEl) trackTitleEl.textContent = "🎬 YouTube: " + videoId;
+    if (trackTitleEl) trackTitleEl.textContent = playlistId ? "🎬 YouTube Playlist" : "🎬 YouTube: " + videoId;
     if (playPauseBtn) playPauseBtn.innerHTML = autoplay ? "❚❚" : "►";
     
     setTimeout(() => { suppressYTEmit = false; }, 800);
@@ -193,20 +218,21 @@
 
     window.__musicRoom = { socket, player };
 
-    // -----------------------
-    // Mini Player (PiP) Fix
-    // -----------------------
+    // UPDATED: Better PiP logic for mobile
     if (pipBtn) {
       pipBtn.addEventListener('click', () => {
-        const iframe = document.querySelector('#ytPlayer');
-        if (iframe) {
-          // Alert user that they must use the built-in YT PiP if browser blocks the button
-          // but we try to trigger a generic full-screen PiP request here
-          if (iframe.requestFullscreen) {
-            iframe.requestFullscreen().catch(() => {
-              alert("Please click the 'Picture-in-Picture' icon inside the YouTube player bar (bottom right).");
-            });
-          }
+        if (!ytPlayer) return;
+        const iframe = document.querySelector('#ytPlayer iframe');
+        if (!iframe) {
+          alert("⚠️ Start a YouTube video first!");
+          return;
+        }
+        if (document.pictureInPictureEnabled) {
+          iframe.requestPictureInPicture().catch(() => {
+            alert("📱 Tap the PiP icon inside YouTube player controls (bottom right)");
+          });
+        } else {
+          alert("📱 Use YouTube player PiP icon (bottom right)");
         }
       });
     }
@@ -214,11 +240,10 @@
     // -----------------------
     // YouTube socket events
     // -----------------------
-    socket.on("playYT", ({ videoId, time = 0, playing = true }) => {
-      playYT(videoId, time, playing);
+    socket.on("playYT", ({ videoId, time = 0, playing = true, playlistId = null }) => {
+      playYT(videoId, time, playing, playlistId);
     });
 
-    // Auto-sync every 2 seconds for YouTube
     setInterval(() => {
       if (ytPlayer && ytPlaying && currentYTId && !suppressYTEmit) {
         socket.emit("syncTime", {
@@ -235,8 +260,15 @@
       playYTBtn.onclick = () => {
         const rawValue = ytLinkInput.value.trim();
         if (!rawValue) { alert("❌ Please paste a YouTube link or ID first!"); return; }
+        
         const videoId = extractVideoId(rawValue);
-        socket.emit("playYT", { roomId: roomCode, videoId });
+        const playlistId = extractPlaylistId(rawValue); // ✅ Extract Playlist if exists
+
+        socket.emit("playYT", { 
+          roomId: roomCode, 
+          videoId, 
+          playlistId 
+        });
       };
     }
 
@@ -293,7 +325,7 @@
     });
 
     // -----------------------
-    // Control buttons (Fixed Resuming)
+    // Control buttons
     // -----------------------
     playPauseBtn.addEventListener('click', () => {
       if (currentYTId) {
@@ -301,7 +333,6 @@
         if (state === YT.PlayerState.PLAYING) {
             socket.emit("pauseSong", { roomId: roomCode });
         } else {
-            // Send current time so everyone resumes at the same spot
             socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
         }
       } else {
@@ -314,7 +345,6 @@
       }
     });
 
-    // ... (rest of helper functions same as before)
     function getAllSongs(category = 'both') {
       const tamil = tamilSelect ? Array.from(tamilSelect.options).map(o => o.value) : [];
       const eng = englishSelect ? Array.from(englishSelect.options).map(o => o.value) : [];
@@ -341,6 +371,9 @@
       });
     });
 
+    // -----------------------
+    // Player Event Listeners
+    // -----------------------
     player.addEventListener('play', () => {
       playPauseBtn.innerHTML = '❚❚';
       if (suppressEmit) return;
@@ -354,6 +387,36 @@
       playPauseBtn.innerHTML = '►';
       if (suppressEmit) return;
       socket.emit('pauseSong', { roomId: roomCode });
+    });
+
+    // ✅ ADDED: Auto-play next song logic
+    player.addEventListener('ended', () => {
+      if (currentYTId) return; // If YouTube is playing, ignore local autoplay
+
+      let list = getAllSongs(lastCategory);
+      if (!list.length) return;
+
+      const cur = songPathToRelative(player.src);
+      let idx = list.indexOf(cur);
+      if (idx === -1) idx = 0;
+
+      const nextIndex = (idx + 1) % list.length;
+      const nextSong = list[nextIndex];
+
+      suppressEmit = true;
+      player.src = nextSong;
+      player.currentTime = 0;
+
+      player.play().then(() => {
+        setNowPlayingUI(nextSong);
+        socket.emit('playSong', {
+          roomId: roomCode,
+          song: nextSong,
+          time: 0,
+          songName: songNameFromPath(nextSong)
+        });
+        suppressEmit = false;
+      }).catch(err => console.error("Autoplay failed:", err));
     });
 
     player.addEventListener('timeupdate', () => {
