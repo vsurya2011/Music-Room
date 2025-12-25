@@ -69,6 +69,7 @@
   }
 
   function songPathToRelative(p) {
+    if (!p) return '';
     try { return new URL(p, location.origin).pathname.replace(/^\//, ''); }
     catch { return p || ''; }
   }
@@ -97,7 +98,7 @@
         modestbranding: 1, 
         controls: 1, 
         playsinline: 1,
-        rel: 1 // ✅ Allows next video suggestions
+        rel: 1 
       },
       events: {
         onStateChange: (event) => {
@@ -129,7 +130,6 @@
     return (match && match[7].length === 11) ? match[7] : url;
   }
 
-  // ✅ New helper to detect Playlist ID
   function extractPlaylistId(url) {
     try {
       const u = new URL(url);
@@ -139,30 +139,18 @@
     }
   }
 
-  // UPDATED: Added Playlist support in playYT
   function playYT(videoId, startTime = 0, autoplay = true, playlistId = null) {
     if (!ytPlayer) return;
-    
     const localPlayer = document.getElementById('player');
     if (localPlayer) localPlayer.pause();
-    
     suppressYTEmit = true;
     
     if (playlistId) {
-      // ✅ Handle Playlist logic
-      ytPlayer.loadPlaylist({
-        listType: "playlist",
-        list: playlistId,
-        index: 0,
-        startSeconds: startTime
-      });
+      ytPlayer.loadPlaylist({ listType: "playlist", list: playlistId, index: 0, startSeconds: startTime });
       currentYTId = "PLAYLIST_ACTIVE"; 
     } else {
-      // Handle Single Video
       let alreadyLoaded = false;
-      if (ytPlayer.getVideoData && ytPlayer.getVideoData().video_id === videoId) {
-          alreadyLoaded = true;
-      }
+      if (ytPlayer.getVideoData && ytPlayer.getVideoData().video_id === videoId) alreadyLoaded = true;
 
       if (!alreadyLoaded) {
           currentYTId = videoId;
@@ -199,7 +187,6 @@
 
     const userSelect = document.getElementById('userSelect');
     const nowPlayingEl = document.getElementById('nowPlaying');
-
     const playPauseBtn = document.getElementById('playPauseBtn');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -209,7 +196,6 @@
     const totalTimeEl = document.getElementById('totalTime');
     const trackTitleEl = document.getElementById('trackTitle');
     const pipBtn = document.getElementById('pipBtn');
-
     const tamilSelect = document.getElementById('tamilSongs');
     const englishSelect = document.getElementById('englishSongs');
 
@@ -218,39 +204,27 @@
 
     window.__musicRoom = { socket, player };
 
-    // UPDATED: Better PiP logic for mobile
+    // PiP logic
     if (pipBtn) {
       pipBtn.addEventListener('click', () => {
         if (!ytPlayer) return;
         const iframe = document.querySelector('#ytPlayer iframe');
-        if (!iframe) {
-          alert("⚠️ Start a YouTube video first!");
-          return;
-        }
-        if (document.pictureInPictureEnabled) {
-          iframe.requestPictureInPicture().catch(() => {
-            alert("📱 Tap the PiP icon inside YouTube player controls (bottom right)");
-          });
+        if (document.pictureInPictureEnabled && iframe) {
+          iframe.requestPictureInPicture().catch(() => alert("📱 Use YouTube PiP icon (bottom right)"));
         } else {
-          alert("📱 Use YouTube player PiP icon (bottom right)");
+          alert("📱 Use YouTube PiP icon (bottom right)");
         }
       });
     }
 
-    // -----------------------
-    // YouTube socket events
-    // -----------------------
+    // Socket Events
     socket.on("playYT", ({ videoId, time = 0, playing = true, playlistId = null }) => {
       playYT(videoId, time, playing, playlistId);
     });
 
     setInterval(() => {
       if (ytPlayer && ytPlaying && currentYTId && !suppressYTEmit) {
-        socket.emit("syncTime", {
-          roomId: roomCode,
-          song: "YOUTUBE_VIDEO",
-          time: ytPlayer.getCurrentTime()
-        });
+        socket.emit("syncTime", { roomId: roomCode, song: "YOUTUBE_VIDEO", time: ytPlayer.getCurrentTime() });
       }
     }, 2000);
 
@@ -259,22 +233,11 @@
     if (playYTBtn) {
       playYTBtn.onclick = () => {
         const rawValue = ytLinkInput.value.trim();
-        if (!rawValue) { alert("❌ Please paste a YouTube link or ID first!"); return; }
-        
-        const videoId = extractVideoId(rawValue);
-        const playlistId = extractPlaylistId(rawValue); // ✅ Extract Playlist if exists
-
-        socket.emit("playYT", { 
-          roomId: roomCode, 
-          videoId, 
-          playlistId 
-        });
+        if (!rawValue) return;
+        socket.emit("playYT", { roomId: roomCode, videoId: extractVideoId(rawValue), playlistId: extractPlaylistId(rawValue) });
       };
     }
 
-    // -----------------------
-    // Local & playlist socket events
-    // -----------------------
     socket.on('playSong', (data) => {
       suppressEmit = true;
       const rel = songPathToRelative(data.song || '');
@@ -295,53 +258,35 @@
     socket.on('pauseSong', () => {
       suppressEmit = true;
       player.pause();
-      if (ytPlayer) { 
-          suppressYTEmit = true; 
-          ytPlayer.pauseVideo(); 
-          setTimeout(()=>suppressYTEmit=false,500); 
-      }
+      if (ytPlayer) { suppressYTEmit = true; ytPlayer.pauseVideo(); setTimeout(()=>suppressYTEmit=false,500); }
       setTimeout(() => { suppressEmit = false; }, 150);
     });
 
     socket.on('syncTime', (data) => {
       if (data.song === "YOUTUBE_VIDEO" && ytPlayer && currentYTId) {
         const diff = Math.abs(ytPlayer.getCurrentTime() - data.time);
-        if (diff > 2.0) {
-          suppressYTEmit = true;
-          ytPlayer.seekTo(data.time, true);
-          setTimeout(() => { suppressYTEmit = false; }, 800);
-        }
+        if (diff > 2.0) { suppressYTEmit = true; ytPlayer.seekTo(data.time, true); setTimeout(() => { suppressYTEmit = false; }, 800); }
         return;
       }
       const rel = songPathToRelative(data.song || '');
       if (songPathToRelative(player.src) === rel) {
         const diff = Math.abs(player.currentTime - data.time);
-        if (diff > 0.8) {
-          suppressEmit = true;
-          player.currentTime = data.time;
-          setTimeout(() => { suppressEmit = false; }, 150);
-        }
+        if (diff > 0.8) { suppressEmit = true; player.currentTime = data.time; setTimeout(() => { suppressEmit = false; }, 150); }
       }
     });
 
-    // -----------------------
-    // Control buttons
-    // -----------------------
+    // Control Buttons
     playPauseBtn.addEventListener('click', () => {
       if (currentYTId) {
         const state = ytPlayer.getPlayerState();
-        if (state === YT.PlayerState.PLAYING) {
-            socket.emit("pauseSong", { roomId: roomCode });
-        } else {
-            socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
-        }
+        if (state === YT.PlayerState.PLAYING) socket.emit("pauseSong", { roomId: roomCode });
+        else socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
       } else {
         if (!player.src) {
           const sel = (englishSelect && englishSelect.value) || (tamilSelect && tamilSelect.value);
           if (sel) player.src = sel;
         }
-        if (player.paused) player.play();
-        else player.pause();
+        if (player.paused) player.play(); else player.pause();
       }
     });
 
@@ -360,24 +305,73 @@
       if (nowPlayingEl) nowPlayingEl.textContent = `🎶 Now Playing: ${name || 'None'}`;
     }
 
-    socket.on('updateUsers', (users) => {
-      if (!userSelect) return;
-      userSelect.innerHTML = '';
-      users.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u;
-        opt.textContent = u;
-        userSelect.appendChild(opt);
+    // -----------------------
+    // 🔥 AUTO PLAY NEXT LOGIC (FIXED & IMPROVED)
+    // -----------------------
+    function playNext() {
+      if (currentYTId) return; 
+
+      let list = getAllSongs(lastCategory);
+      if (!list.length) return;
+
+      const currentPath = songPathToRelative(player.src);
+      let idx = list.indexOf(currentPath);
+      
+      // Fallback: if path matching is weird, find by filename
+      if (idx === -1) {
+        const fileName = songNameFromPath(currentPath);
+        idx = list.findIndex(s => songNameFromPath(s) === fileName);
+      }
+
+      const nextIdx = (idx + 1) % list.length;
+      const nextSong = list[nextIdx];
+
+      console.log("Auto-playing next:", nextSong);
+
+      suppressEmit = true;
+      player.src = nextSong;
+      player.load(); // Force reset player state
+      
+      player.play().then(() => {
+        setNowPlayingUI(nextSong);
+        socket.emit('playSong', {
+          roomId: roomCode,
+          song: nextSong,
+          time: 0,
+          songName: songNameFromPath(nextSong)
+        });
+        suppressEmit = false;
+      }).catch(err => {
+        console.error("Autoplay blocked. User interaction needed.", err);
+        suppressEmit = false;
+      });
+    }
+
+    player.addEventListener('ended', playNext);
+    nextBtn.addEventListener('click', playNext);
+    
+    prevBtn.addEventListener('click', () => {
+      if (currentYTId) return;
+      let list = getAllSongs(lastCategory);
+      const cur = songPathToRelative(player.src);
+      let idx = list.indexOf(cur);
+      const prevIdx = (idx - 1 + list.length) % list.length;
+      const prevSong = list[prevIdx];
+      suppressEmit = true;
+      player.src = prevSong;
+      player.play().finally(() => {
+        setNowPlayingUI(prevSong);
+        socket.emit('playSong', { roomId: roomCode, song: prevSong, time: 0, songName: songNameFromPath(prevSong) });
+        suppressEmit = false;
       });
     });
 
     // -----------------------
-    // Player Event Listeners
+    // Standard Events
     // -----------------------
     player.addEventListener('play', () => {
       playPauseBtn.innerHTML = '❚❚';
       if (suppressEmit) return;
-      if (ytPlayer && ytPlaying) { suppressYTEmit = true; ytPlayer.pauseVideo(); setTimeout(()=>suppressYTEmit=false,500); }
       const rel = songPathToRelative(player.src);
       socket.emit('playSong', { roomId: roomCode, song: rel, time: player.currentTime, songName: songNameFromPath(rel) });
       setNowPlayingUI(rel);
@@ -389,36 +383,6 @@
       socket.emit('pauseSong', { roomId: roomCode });
     });
 
-    // ✅ ADDED: Auto-play next song logic
-    player.addEventListener('ended', () => {
-      if (currentYTId) return; // If YouTube is playing, ignore local autoplay
-
-      let list = getAllSongs(lastCategory);
-      if (!list.length) return;
-
-      const cur = songPathToRelative(player.src);
-      let idx = list.indexOf(cur);
-      if (idx === -1) idx = 0;
-
-      const nextIndex = (idx + 1) % list.length;
-      const nextSong = list[nextIndex];
-
-      suppressEmit = true;
-      player.src = nextSong;
-      player.currentTime = 0;
-
-      player.play().then(() => {
-        setNowPlayingUI(nextSong);
-        socket.emit('playSong', {
-          roomId: roomCode,
-          song: nextSong,
-          time: 0,
-          songName: songNameFromPath(nextSong)
-        });
-        suppressEmit = false;
-      }).catch(err => console.error("Autoplay failed:", err));
-    });
-
     player.addEventListener('timeupdate', () => {
       const cur = player.currentTime || 0;
       const dur = player.duration || 0;
@@ -428,52 +392,14 @@
       totalTimeEl.textContent = formatTime(dur);
     });
 
-    prevBtn.addEventListener('click', () => {
-      if (currentYTId) return;
-      let list = getAllSongs(lastCategory);
-      const cur = songPathToRelative(player.src);
-      let idx = list.indexOf(cur);
-      if (idx === -1) idx = 0;
-      const prevIndex = (idx - 1 + list.length) % list.length;
-      const prevSong = list[prevIndex];
-      suppressEmit = true;
-      player.src = prevSong;
-      player.currentTime = 0;
-      player.play().finally(() => {
-        setNowPlayingUI(prevSong);
-        socket.emit('playSong', { roomId: roomCode, song: prevSong, time: 0, songName: songNameFromPath(prevSong) });
-        suppressEmit = false;
-      });
-    });
-
-    nextBtn.addEventListener('click', () => {
-      if (currentYTId) return;
-      let list = getAllSongs(lastCategory);
-      const cur = songPathToRelative(player.src);
-      let idx = list.indexOf(cur);
-      if (idx === -1) idx = 0;
-      const nextIndex = (idx + 1) % list.length;
-      const nextSong = list[nextIndex];
-      suppressEmit = true;
-      player.src = nextSong;
-      player.currentTime = 0;
-      player.play().finally(() => {
-        setNowPlayingUI(nextSong);
-        socket.emit('playSong', { roomId: roomCode, song: nextSong, time: 0, songName: songNameFromPath(nextSong) });
-        suppressEmit = false;
-      });
-    });
-
+    // Seek logic
     let seeking = false;
     function seekFromEvent(e) {
       const rect = progress.getBoundingClientRect();
       const clientX = (e.touches ? e.touches[0].clientX : e.clientX);
-      let pct = (clientX - rect.left) / rect.width;
-      pct = Math.max(0, Math.min(1, pct));
+      let pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       if (player.duration && !currentYTId) {
         player.currentTime = pct * player.duration;
-        progressFill.style.width = `${pct * 100}%`;
-        currentTimeEl.textContent = formatTime(player.currentTime);
         if (!suppressEmit) socket.emit('syncTime', { roomId: roomCode, song: songPathToRelative(player.src), time: player.currentTime });
       } else if (currentYTId && ytPlayer) {
           const time = pct * ytPlayer.getDuration();
@@ -485,44 +411,19 @@
     window.addEventListener('mousemove', (e) => { if (seeking) seekFromEvent(e); });
     window.addEventListener('mouseup', () => { if (seeking) seeking = false; });
 
-    const playTamilBtn = document.getElementById('playTamilBtn');
-    const playEnglishBtn = document.getElementById('playEnglishBtn');
-    if (playTamilBtn) playTamilBtn.addEventListener('click', () => {
-      const song = tamilSelect.value; if(!song) return;
-      lastCategory='tamil'; currentYTId = null;
-      player.src=song; player.currentTime=0; player.play();
-      socket.emit('playSong', { roomId: roomCode, song, time:0, songName:songNameFromPath(song) });
-      setNowPlayingUI(song);
-    });
-    if (playEnglishBtn) playEnglishBtn.addEventListener('click', () => {
-      const song = englishSelect.value; if(!song) return;
-      lastCategory='english'; currentYTId = null;
-      player.src=song; player.currentTime=0; player.play();
-      socket.emit('playSong', { roomId: roomCode, song, time:0, songName:songNameFromPath(song) });
-      setNowPlayingUI(song);
-    });
-
-    const fileInput = document.getElementById("fileInput");
-    const playLocalBtn = document.getElementById("playLocalBtn");
-    const localStatus = document.getElementById("localStatus");
-    if (playLocalBtn && fileInput) {
-      playLocalBtn.addEventListener('click', async () => {
-        const file = fileInput.files[0];
-        if (!file) { localStatus.textContent = "❌ Please choose a song first"; return; }
-        localStatus.textContent = "⏳ Uploading & sharing...";
-        const formData = new FormData(); formData.append("song", file);
-        try {
-          const res = await fetch("/upload",{method:"POST",body:formData});
-          const data = await res.json();
-          if (!data.url) throw new Error("Upload failed");
-          const songUrl = data.url;
-          currentYTId = null;
-          suppressEmit=true; player.src=songUrl; player.currentTime=0; await player.play();
-          setNowPlayingUI(songUrl);
-          socket.emit("playSong",{roomId: roomCode, song:songUrl, time:0, songName:file.name});
-          localStatus.textContent="✅ Playing & shared"; suppressEmit=false;
-          if (ytPlayer && ytPlaying) { suppressYTEmit = true; ytPlayer.pauseVideo(); setTimeout(()=>suppressYTEmit=false,500); }
-        } catch(err){console.error(err); localStatus.textContent="❌ Failed to upload/play";}
+    // Category Buttons
+    if (document.getElementById('playTamilBtn')) {
+      document.getElementById('playTamilBtn').addEventListener('click', () => {
+        const song = tamilSelect.value; if(!song) return;
+        lastCategory='tamil'; currentYTId = null;
+        player.src=song; player.play();
+      });
+    }
+    if (document.getElementById('playEnglishBtn')) {
+      document.getElementById('playEnglishBtn').addEventListener('click', () => {
+        const song = englishSelect.value; if(!song) return;
+        lastCategory='english'; currentYTId = null;
+        player.src=song; player.play();
       });
     }
 
