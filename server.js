@@ -62,44 +62,19 @@ app.get("/", (req, res) => {
 });
 
 // ====================
-// 🔐 OWNER LOGIN PAGE
-// ====================
-app.get("/owner-login/:roomId", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "owner-login.html"));
-});
-
-// ====================
-// 🔐 OWNER AUTH API
-// ====================
-app.post("/owner-auth", (req, res) => {
-  const { password, roomId } = req.body;
-  if (password === OWNER_PASSWORD) {
-    return res.json({ success: true, roomId });
-  }
-  res.json({ success: false });
-});
-
-// ====================
 // 🔐 ROOM ACCESS CONTROL
 // ====================
 app.get("/room/:roomId", (req, res) => {
   const { roomId } = req.params;
-  const { token, owner } = req.query;
+  const { owner } = req.query;
 
   // 👑 OWNER ACCESS
   if (owner === "true") {
     return res.sendFile(path.join(__dirname, "public", "room.html"));
   }
 
-  // 🔓 INVITE ACCESS (one-time token)
-  if (token && roomTokens[roomId]?.has(token)) {
-    // Remove token after first use
-    roomTokens[roomId].delete(token);
-    return res.sendFile(path.join(__dirname, "public", "room.html"));
-  }
-
   // 🔒 OTHERWISE → OWNER LOGIN
-  res.redirect(`/owner-login/${roomId}`);
+  res.redirect("/");
 });
 
 // ====================
@@ -114,9 +89,7 @@ io.on("connection", (socket) => {
   socket.on("createRoom", ({ roomId, ownerName }) => {
     const token = crypto.randomBytes(16).toString("hex");
 
-    if (!roomTokens[roomId]) {
-      roomTokens[roomId] = new Set();
-    }
+    if (!roomTokens[roomId]) roomTokens[roomId] = new Set();
     roomTokens[roomId].add(token);
 
     roomOwners[roomId] = socket.id;
@@ -150,10 +123,7 @@ io.on("connection", (socket) => {
       };
     }
 
-    if (!rooms[roomId].users.includes(username)) {
-      rooms[roomId].users.push(username);
-    }
-
+    if (!rooms[roomId].users.includes(username)) rooms[roomId].users.push(username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
     const room = rooms[roomId];
@@ -194,10 +164,7 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    if (room.playing && room.lastUpdate) {
-      room.time += (Date.now() - room.lastUpdate) / 1000;
-    }
-
+    if (room.playing && room.lastUpdate) room.time += (Date.now() - room.lastUpdate) / 1000;
     room.playing = false;
     room.lastUpdate = null;
     io.to(roomId).emit("pauseSong");
@@ -236,26 +203,39 @@ io.on("connection", (socket) => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
 
-    // Remove user
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // If owner disconnected → close room
     if (roomOwners[roomId] === socket.id) {
       io.to(roomId).emit("roomClosed");
       delete rooms[roomId];
       delete roomTokens[roomId];
       delete roomOwners[roomId];
       console.log(`🧹 Owner left, room destroyed: ${roomId}`);
-    }
-
-    // If room empty → clean up
-    else if (rooms[roomId].users.length === 0) {
+    } else if (rooms[roomId].users.length === 0) {
       delete rooms[roomId];
       delete roomTokens[roomId];
       console.log(`🧹 Room empty, cleaned: ${roomId}`);
     }
   });
+});
+
+// ====================
+// 🔐 OWNER LOGIN API (create new room automatically)
+// ====================
+app.post("/check-owner-password", (req, res) => {
+  const { password } = req.body;
+
+  if (password === OWNER_PASSWORD) {
+    // Generate a new roomId for the owner
+    const roomId = crypto.randomBytes(4).toString("hex");
+    rooms[roomId] = { users: [], song: null, songName: null, ytVideoId: null, time: 0, playing: false, lastUpdate: null };
+    roomOwners[roomId] = null; // will be set when owner connects via socket
+
+    return res.json({ success: true, roomId });
+  } else {
+    return res.json({ success: false });
+  }
 });
 
 // ====================

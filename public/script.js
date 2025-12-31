@@ -496,5 +496,45 @@ if(copyLinkBtn) {
 
  if (window.location.pathname.endsWith('room.html'))
  window.addEventListener('DOMContentLoaded', initRoom);
+const ownerLoginBtn = document.getElementById('ownerLoginBtn');
+const ownerRoomCodeInput = document.getElementById('ownerRoomCode');
+const ownerPasswordInput = document.getElementById('ownerPassword');
+const ownerLoginStatus = document.getElementById('ownerLoginStatus');
+
+if (ownerLoginBtn) {
+  ownerLoginBtn.addEventListener('click', () => {
+    const roomCode = ownerRoomCodeInput.value.trim();
+    const password = ownerPasswordInput.value.trim();
+    
+    if (!roomCode || !password) {
+      ownerLoginStatus.textContent = "❌ Please enter both Room Code and Password!";
+      return;
+    }
+
+    ownerLoginStatus.textContent = "⏳ Verifying...";
+
+    fetch('/ownerLogin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomCode, password })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        localStorage.setItem('roomId', roomCode);
+        localStorage.setItem('username', data.ownerName || 'Owner');
+        ownerLoginStatus.textContent = "✅ Owner login successful!";
+        window.location.href = 'room.html?owner=true';
+      } else {
+        ownerLoginStatus.textContent = "❌ " + (data.message || "Invalid Room Code or Password");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      ownerLoginStatus.textContent = "❌ Server error, try again!";
+    });
+  });
+}
+
 
 })();

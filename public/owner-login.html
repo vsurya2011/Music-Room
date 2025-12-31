@@ -2,49 +2,66 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Owner Login</title>
+  <title>Owner Login - Music Room</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
     body {
-      background: url('AI.jpg') no-repeat center center fixed;
+      background: url('a.jpg') no-repeat center center fixed;
       background-size: cover;
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px;
       color: #fff;
     }
     .container {
-      background: rgba(0,0,0,0.6);
-      border-radius: 12px;
-      padding: 20px 24px;
-      width: 360px;
+      background: rgba(0,0,0,0.55);
+      padding: 40px 50px;
+      border-radius: 15px;
+      text-align: center;
+      width: 350px;
       backdrop-filter: blur(8px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
     }
-    h2 { text-align:center; margin-bottom: 16px; font-size:22px; text-shadow:1px 1px 5px rgba(0,0,0,0.7); }
-    input[type="password"] {
-      width: 100%; padding: 10px; border-radius:8px; border:none; margin-bottom:12px; font-size:15px;
-    }
-    button {
-      width: 100%; padding: 10px; border:none; border-radius:8px; background:#06b6d4; color:#fff;
-      font-weight:500; font-size:15px; cursor:pointer; transition:0.2s;
-    }
-    button:hover { background:#0ea5e9; }
-    #status { margin-top:10px; font-size:14px; text-align:center; color:#ffd700; }
+    h2 { margin-bottom: 30px; font-size:28px; font-weight:700; text-shadow:1px 1px 5px rgba(0,0,0,0.7); }
+    input { width:100%; padding:12px 15px; margin-bottom:20px; border-radius:8px; border:none; outline:none; font-size:16px; }
+    input::placeholder { color:#ccc; }
+    button { width:100%; padding:12px 0; border:none; border-radius:8px; background:#1e90ff; color:#fff; font-size:16px; cursor:pointer; font-weight:500; transition:0.3s; }
+    button:hover { background:#0073e6; }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>🔐 Owner Login</h2>
-    <input type="password" id="passwordInput" placeholder="Enter owner password" />
-    <button id="loginBtn">Login</button>
-    <div id="status"></div>
+    <input type="password" id="password" placeholder="Enter owner password">
+    <input type="text" id="ownerName" placeholder="Enter your name">
+    <button onclick="loginOwner()">Login & Create Room</button>
   </div>
 
-  <script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
-  <script src="owner-login.js"></script>
+  <script>
+    const roomId = window.location.pathname.split("/").pop();
+
+    async function loginOwner() {
+      const password = document.getElementById("password").value.trim();
+      const ownerName = document.getElementById("ownerName").value.trim() || "Owner";
+
+      if(!password) return alert("Enter password!");
+
+      const res = await fetch("/owner-auth", {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ password, roomId })
+      });
+
+      const data = await res.json();
+      if(!data.success) return alert("❌ Wrong password!");
+
+      // Redirect owner with owner=true
+      localStorage.setItem("username", ownerName);
+      window.location.href = `/room/${roomId}?owner=true`;
+    }
+  </script>
+<script src="owner-login.js"></script>
 </body>
 </html>

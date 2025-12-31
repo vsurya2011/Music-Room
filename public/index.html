@@ -67,15 +67,27 @@
 
       if(!roomId) return alert("Enter a room code!");
 
-      // Navigate to room via token not needed for normal user
       localStorage.setItem("username", username);
       window.location.href = `/room/${roomId}`;
     }
 
-    function ownerLogin() {
-      const roomId = document.getElementById("room").value.trim();
-      if(!roomId) return alert("Enter a room code for owner login!");
-      window.location.href = `/owner-login/${roomId}`;
+    async function ownerLogin() {
+      const password = prompt("Enter Owner Password:");
+      if(!password) return;
+
+      try {
+        const res = await fetch(`/check-owner-password/${password}`);
+        const data = await res.json();
+
+        if(data.success){
+          window.location.href = "/owner-dashboard";
+        } else {
+          alert("❌ Incorrect password!");
+        }
+      } catch (err) {
+        alert("Error connecting to server");
+        console.error(err);
+      }
     }
   </script>
 </body>
