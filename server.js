@@ -8,11 +8,16 @@ import fs from "fs";
 import crypto from "crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// ====================
+// 🔧 MIDDLEWARE (VERY IMPORTANT)
+// ====================
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ====================
 // 🔐 OWNER PASSWORD
@@ -20,12 +25,12 @@ app.use(express.json());
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "surya123";
 
 // ====================
-// Static files
+// 📁 STATIC FILES
 // ====================
 app.use(express.static(path.join(__dirname, "public")));
 
 // ====================
-// Upload setup
+// 📤 UPLOAD SETUP
 // ====================
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
@@ -37,75 +42,81 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
+
 app.use("/uploads", express.static(uploadsDir));
 
 // ====================
-// Room & Token state
+// 🧠 ROOM STATE
 // ====================
 const rooms = {};
-const roomTokens = {}; // roomId -> Set(tokens)
 const roomOwners = {}; // roomId -> socket.id
 
 // ====================
-// Routes
+// 🌐 ROUTES
+// ====================
+
+// Home
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ====================
+// 🔐 OWNER AUTH (PASSWORD ONLY)
+// ====================
+app.post("/owner-auth", (req, res) => {
+  const { password } = req.body;
+
+  if (!password || password !== OWNER_PASSWORD) {
+    return res.json({ success: false });
+  }
+
+  // Create room automatically
+  const roomId = crypto.randomBytes(4).toString("hex");
+
+  rooms[roomId] = {
+    users: [],
+    song: null,
+    songName: null,
+    ytVideoId: null,
+    time: 0,
+    playing: false,
+    lastUpdate: null
+  };
+
+  return res.json({
+    success: true,
+    roomId
+  });
+});
+
+// ====================
+// 🎶 ROOM PAGE
+// ====================
+app.get("/room/:roomId", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "room.html"));
+});
+
+// ====================
+// 📤 SONG UPLOAD
 // ====================
 app.post("/upload", upload.single("song"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
+
   res.json({
     url: `/uploads/${req.file.filename}`,
     name: req.file.originalname
   });
 });
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
 // ====================
-// 🔐 ROOM ACCESS CONTROL
-// ====================
-app.get("/room/:roomId", (req, res) => {
-  const { roomId } = req.params;
-  const { owner } = req.query;
-
-  // 👑 OWNER ACCESS
-  if (owner === "true") {
-    return res.sendFile(path.join(__dirname, "public", "room.html"));
-  }
-
-  // 🔒 OTHERWISE → OWNER LOGIN
-  res.redirect("/");
-});
-
-// ====================
-// Socket.IO
+// 🔌 SOCKET.IO
 // ====================
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log("🔌 Connected:", socket.id);
 
-  // ====================
-  // CREATE ROOM + INVITE
-  // ====================
-  socket.on("createRoom", ({ roomId, ownerName }) => {
-    const token = crypto.randomBytes(16).toString("hex");
-
-    if (!roomTokens[roomId]) roomTokens[roomId] = new Set();
-    roomTokens[roomId].add(token);
-
-    roomOwners[roomId] = socket.id;
-
-    socket.emit("roomCreated", {
-      roomId,
-      token,
-      link: `/room/${roomId}?token=${token}`
-    });
-  });
-
-  // ====================
   // JOIN ROOM
-  // ====================
   socket.on("joinRoom", ({ roomId, username }) => {
-    if (!username || !roomId) return socket.disconnect(true);
+    if (!roomId || !username) return;
 
     socket.join(roomId);
     socket.roomId = roomId;
@@ -123,10 +134,14 @@ io.on("connection", (socket) => {
       };
     }
 
-    if (!rooms[roomId].users.includes(username)) rooms[roomId].users.push(username);
+    if (!rooms[roomId].users.includes(username)) {
+      rooms[roomId].users.push(username);
+    }
+
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
     const room = rooms[roomId];
+
     if (room.song) {
       socket.emit("playSong", {
         song: room.song,
@@ -143,9 +158,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ====================
-  // Local Song
-  // ====================
+  // LOCAL SONG
   socket.on("playSong", ({ roomId, song, songName, time }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -157,31 +170,29 @@ io.on("connection", (socket) => {
     room.playing = true;
     room.lastUpdate = Date.now();
 
-    io.to(roomId).emit("playSong", { song, songName, time: room.time, playing: true });
+    io.to(roomId).emit("playSong", {
+      song,
+      songName,
+      time: room.time,
+      playing: true
+    });
   });
 
   socket.on("pauseSong", ({ roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    if (room.playing && room.lastUpdate) room.time += (Date.now() - room.lastUpdate) / 1000;
+    if (room.playing && room.lastUpdate) {
+      room.time += (Date.now() - room.lastUpdate) / 1000;
+    }
+
     room.playing = false;
     room.lastUpdate = null;
+
     io.to(roomId).emit("pauseSong");
   });
 
-  socket.on("syncTime", ({ roomId, song, time }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-
-    room.time = time;
-    room.lastUpdate = Date.now();
-    socket.to(roomId).emit("syncTime", { song, time });
-  });
-
-  // ====================
-  // YouTube
-  // ====================
+  // YOUTUBE
   socket.on("playYT", ({ roomId, videoId, time }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -189,16 +200,29 @@ io.on("connection", (socket) => {
     room.song = null;
     room.songName = null;
     room.ytVideoId = videoId;
+    room.time = time || 0;
     room.playing = true;
-    room.time = time || room.time || 0;
     room.lastUpdate = Date.now();
 
-    io.to(roomId).emit("playYT", { videoId, time: room.time, playing: true });
+    io.to(roomId).emit("playYT", {
+      videoId,
+      time: room.time,
+      playing: true
+    });
   });
 
-  // ====================
+  // SYNC TIME
+  socket.on("syncTime", ({ roomId, time }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    room.time = time;
+    room.lastUpdate = Date.now();
+
+    socket.to(roomId).emit("syncTime", { time });
+  });
+
   // DISCONNECT
-  // ====================
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
@@ -206,42 +230,17 @@ io.on("connection", (socket) => {
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    if (roomOwners[roomId] === socket.id) {
-      io.to(roomId).emit("roomClosed");
+    if (rooms[roomId].users.length === 0) {
       delete rooms[roomId];
-      delete roomTokens[roomId];
-      delete roomOwners[roomId];
-      console.log(`🧹 Owner left, room destroyed: ${roomId}`);
-    } else if (rooms[roomId].users.length === 0) {
-      delete rooms[roomId];
-      delete roomTokens[roomId];
-      console.log(`🧹 Room empty, cleaned: ${roomId}`);
+      console.log("🧹 Room cleaned:", roomId);
     }
   });
 });
 
 // ====================
-// 🔐 OWNER LOGIN API (create new room automatically)
+// 🚀 START SERVER
 // ====================
-app.post("/check-owner-password", (req, res) => {
-  const { password } = req.body;
-
-  if (password === OWNER_PASSWORD) {
-    // Generate a new roomId for the owner
-    const roomId = crypto.randomBytes(4).toString("hex");
-    rooms[roomId] = { users: [], song: null, songName: null, ytVideoId: null, time: 0, playing: false, lastUpdate: null };
-    roomOwners[roomId] = null; // will be set when owner connects via socket
-
-    return res.json({ success: true, roomId });
-  } else {
-    return res.json({ success: false });
-  }
-});
-
-// ====================
-// Server start
-// ====================
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`✅ Server running on port ${port}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
