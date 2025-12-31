@@ -37,7 +37,6 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
-
 app.use("/uploads", express.static(uploadsDir));
 
 // ====================
@@ -45,6 +44,7 @@ app.use("/uploads", express.static(uploadsDir));
 // ====================
 const rooms = {};
 const roomTokens = {}; // roomId -> Set(tokens)
+const roomOwners = {}; // roomId -> socket.id
 
 // ====================
 // Routes
@@ -73,11 +73,9 @@ app.get("/owner-login/:roomId", (req, res) => {
 // ====================
 app.post("/owner-auth", (req, res) => {
   const { password, roomId } = req.body;
-
   if (password === OWNER_PASSWORD) {
     return res.json({ success: true, roomId });
   }
-
   res.json({ success: false });
 });
 
@@ -93,8 +91,10 @@ app.get("/room/:roomId", (req, res) => {
     return res.sendFile(path.join(__dirname, "public", "room.html"));
   }
 
-  // 🔓 INVITE ACCESS
+  // 🔓 INVITE ACCESS (one-time token)
   if (token && roomTokens[roomId]?.has(token)) {
+    // Remove token after first use
+    roomTokens[roomId].delete(token);
     return res.sendFile(path.join(__dirname, "public", "room.html"));
   }
 
@@ -111,14 +111,15 @@ io.on("connection", (socket) => {
   // ====================
   // CREATE ROOM + INVITE
   // ====================
-  socket.on("createRoom", ({ roomId }) => {
+  socket.on("createRoom", ({ roomId, ownerName }) => {
     const token = crypto.randomBytes(16).toString("hex");
 
     if (!roomTokens[roomId]) {
       roomTokens[roomId] = new Set();
     }
-
     roomTokens[roomId].add(token);
+
+    roomOwners[roomId] = socket.id;
 
     socket.emit("roomCreated", {
       roomId,
@@ -131,9 +132,11 @@ io.on("connection", (socket) => {
   // JOIN ROOM
   // ====================
   socket.on("joinRoom", ({ roomId, username }) => {
+    if (!username || !roomId) return socket.disconnect(true);
+
     socket.join(roomId);
     socket.roomId = roomId;
-    socket.username = username || "Guest";
+    socket.username = username;
 
     if (!rooms[roomId]) {
       rooms[roomId] = {
@@ -147,8 +150,8 @@ io.on("connection", (socket) => {
       };
     }
 
-    if (!rooms[roomId].users.includes(socket.username)) {
-      rooms[roomId].users.push(socket.username);
+    if (!rooms[roomId].users.includes(username)) {
+      rooms[roomId].users.push(username);
     }
 
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
@@ -184,12 +187,7 @@ io.on("connection", (socket) => {
     room.playing = true;
     room.lastUpdate = Date.now();
 
-    io.to(roomId).emit("playSong", {
-      song,
-      songName,
-      time: room.time,
-      playing: true
-    });
+    io.to(roomId).emit("playSong", { song, songName, time: room.time, playing: true });
   });
 
   socket.on("pauseSong", ({ roomId }) => {
@@ -228,27 +226,34 @@ io.on("connection", (socket) => {
     room.time = time || room.time || 0;
     room.lastUpdate = Date.now();
 
-    io.to(roomId).emit("playYT", {
-      videoId,
-      time: room.time,
-      playing: true
-    });
+    io.to(roomId).emit("playYT", { videoId, time: room.time, playing: true });
   });
 
   // ====================
-  // Disconnect
+  // DISCONNECT
   // ====================
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
 
+    // Remove user
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    if (rooms[roomId].users.length === 0) {
+    // If owner disconnected → close room
+    if (roomOwners[roomId] === socket.id) {
+      io.to(roomId).emit("roomClosed");
       delete rooms[roomId];
       delete roomTokens[roomId];
-      console.log("🧹 Room cleaned:", roomId);
+      delete roomOwners[roomId];
+      console.log(`🧹 Owner left, room destroyed: ${roomId}`);
+    }
+
+    // If room empty → clean up
+    else if (rooms[roomId].users.length === 0) {
+      delete rooms[roomId];
+      delete roomTokens[roomId];
+      console.log(`🧹 Room empty, cleaned: ${roomId}`);
     }
   });
 });
