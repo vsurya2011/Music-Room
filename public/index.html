@@ -24,35 +24,40 @@
       backdrop-filter: blur(8px);
       box-shadow: 0 8px 25px rgba(0,0,0,0.5);
     }
-    h2 { margin-bottom: 30px; font-size:28px; font-weight:700; text-shadow:1px 1px 5px rgba(0,0,0,0.7); }
-    label { display:block; margin-bottom:5px; font-weight:500; text-align:left; }
-    input { width:100%; padding:12px 15px; margin-bottom:20px; border-radius:8px; border:none; outline:none; font-size:16px; }
-    input::placeholder { color:#ccc; }
+    h2 { margin-bottom: 30px; font-size:28px; font-weight:700; }
+    label { display:block; margin-bottom:5px; text-align:left; }
+    input {
+      width:100%;
+      padding:12px 15px;
+      margin-bottom:20px;
+      border-radius:8px;
+      border:none;
+      font-size:16px;
+    }
     button {
-      width: 48%; padding:12px 0; margin:5px 1%;
-      border:none; border-radius:8px; background:#ff6b81;
-      color:#fff; font-size:16px; cursor:pointer; font-weight:500; transition:0.3s;
+      width: 48%;
+      padding:12px 0;
+      margin:5px 1%;
+      border:none;
+      border-radius:8px;
+      background:#ff6b81;
+      color:#fff;
+      font-size:16px;
+      cursor:pointer;
     }
     button:hover { background:#ff4757; }
-    @media (max-width:400px){
-      .container { width:90%; padding:30px 20px; }
-      button { width:100%; margin:5px 0; }
-    }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h2>🎤 Music Room</h2>
 
-    <div>
-      <label for="username">Username</label>
-      <input type="text" id="username" placeholder="Enter your name">
-    </div>
+    <label>Username</label>
+    <input type="text" id="username" placeholder="Enter your name">
 
-    <div>
-      <label for="room">Room Code</label>
-      <input type="text" id="room" placeholder="Enter room code">
-    </div>
+    <label>Room Code</label>
+    <input type="text" id="room" placeholder="Enter room code">
 
     <div>
       <button onclick="joinRoom()">Join Room</button>
@@ -60,12 +65,15 @@
     </div>
   </div>
 
+  <!-- ✅ SOCKET.IO -->
+  <script src="/socket.io/socket.io.js"></script>
   <script>
+    const socket = io();
+
     function joinRoom() {
       const roomId = document.getElementById("room").value.trim();
       const username = document.getElementById("username").value.trim() || "Guest";
-
-      if(!roomId) return alert("Enter a room code!");
+      if (!roomId) return alert("Enter a room code!");
 
       localStorage.setItem("username", username);
       window.location.href = `/room/${roomId}`;
@@ -73,19 +81,24 @@
 
     async function ownerLogin() {
       const password = prompt("Enter Owner Password:");
-      if(!password) return;
+      if (!password) return;
 
       try {
-        const res = await fetch(`/check-owner-password/${password}`);
+        const res = await fetch("/owner-auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password })
+        });
+
         const data = await res.json();
 
-        if(data.success){
-          window.location.href = "/owner-dashboard";
+        if (data.success) {
+          window.location.href = `/room/${data.roomId}?owner=true`;
         } else {
-          alert("❌ Incorrect password!");
+          alert("❌ Wrong password!");
         }
       } catch (err) {
-        alert("Error connecting to server");
+        alert("❌ Error connecting to server");
         console.error(err);
       }
     }
