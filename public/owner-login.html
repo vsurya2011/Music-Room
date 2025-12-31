@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Owner Access</title>
+  <style>
+    body {
+      background:#0f172a;
+      color:white;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
+      font-family:Arial;
+    }
+    input, button {
+      padding:12px;
+      margin-top:10px;
+      width:100%;
+      font-size:16px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h2>🔐 Owner Access</h2>
+    <input type="password" id="pass" placeholder="Enter password" />
+    <button onclick="login()">Enter Room</button>
+    <p id="msg"></p>
+  </div>
+
+  <script>
+    async function login() {
+      const pass = document.getElementById("pass").value;
+      const res = await fetch("/owner-auth", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ password: pass, roomId: location.pathname.split("/").pop() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        location.href = `/room/${data.roomId}?owner=true`;
+      } else {
+        document.getElementById("msg").innerText = "❌ Wrong password";
+      }
+    }
+  </script>
+</body>
+</html>

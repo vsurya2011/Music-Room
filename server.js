@@ -12,14 +12,21 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// --------------------
+app.use(express.json());
+
+// ====================
+// 🔐 OWNER PASSWORD
+// ====================
+const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "surya123";
+
+// ====================
 // Static files
-// --------------------
+// ====================
 app.use(express.static(path.join(__dirname, "public")));
 
-// --------------------
+// ====================
 // Upload setup
-// --------------------
+// ====================
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
@@ -33,9 +40,15 @@ const upload = multer({ storage });
 
 app.use("/uploads", express.static(uploadsDir));
 
-// --------------------
+// ====================
+// Room & Token state
+// ====================
+const rooms = {};
+const roomTokens = {}; // roomId -> Set(tokens)
+
+// ====================
 // Routes
-// --------------------
+// ====================
 app.post("/upload", upload.single("song"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
   res.json({
@@ -48,24 +61,56 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.get("/room/:roomId", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "room.html"));
+// ====================
+// 🔐 OWNER LOGIN PAGE
+// ====================
+app.get("/owner-login/:roomId", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "owner-login.html"));
 });
 
-// --------------------
-// Room state
-// --------------------
-const rooms = {};
+// ====================
+// 🔐 OWNER AUTH API
+// ====================
+app.post("/owner-auth", (req, res) => {
+  const { password, roomId } = req.body;
 
-// 🔐 TOKEN STORE (roomId -> Set(tokens))
-const roomTokens = {};
+  if (password === OWNER_PASSWORD) {
+    return res.json({ success: true, roomId });
+  }
 
-// -------------------- Socket.IO
-// --------------------
+  res.json({ success: false });
+});
+
+// ====================
+// 🔐 ROOM ACCESS CONTROL
+// ====================
+app.get("/room/:roomId", (req, res) => {
+  const { roomId } = req.params;
+  const { token, owner } = req.query;
+
+  // 👑 OWNER ACCESS
+  if (owner === "true") {
+    return res.sendFile(path.join(__dirname, "public", "room.html"));
+  }
+
+  // 🔓 INVITE ACCESS
+  if (token && roomTokens[roomId]?.has(token)) {
+    return res.sendFile(path.join(__dirname, "public", "room.html"));
+  }
+
+  // 🔒 OTHERWISE → OWNER LOGIN
+  res.redirect(`/owner-login/${roomId}`);
+});
+
+// ====================
+// Socket.IO
+// ====================
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // -------------------- CREATE ROOM (HOST)
+  // ====================
+  // CREATE ROOM + INVITE
+  // ====================
   socket.on("createRoom", ({ roomId }) => {
     const token = crypto.randomBytes(16).toString("hex");
 
@@ -75,24 +120,16 @@ io.on("connection", (socket) => {
 
     roomTokens[roomId].add(token);
 
-    socket.emit("roomCreated", { roomId, token });
+    socket.emit("roomCreated", {
+      roomId,
+      token,
+      link: `/room/${roomId}?token=${token}`
+    });
   });
 
-  // -------------------- VALIDATE TOKEN (ONE TIME)
-  socket.on("validateToken", ({ roomId, token }) => {
-    if (
-      roomTokens[roomId] &&
-      roomTokens[roomId].has(token)
-    ) {
-      // Allow once
-      roomTokens[roomId].delete(token);
-      socket.emit("tokenResult", { success: true });
-    } else {
-      socket.emit("tokenResult", { success: false });
-    }
-  });
-
-  // -------------------- Join Room (AFTER TOKEN OK)
+  // ====================
+  // JOIN ROOM
+  // ====================
   socket.on("joinRoom", ({ roomId, username }) => {
     socket.join(roomId);
     socket.roomId = roomId;
@@ -133,7 +170,9 @@ io.on("connection", (socket) => {
     }
   });
 
-  // -------------------- Local Song
+  // ====================
+  // Local Song
+  // ====================
   socket.on("playSong", ({ roomId, song, songName, time }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -175,7 +214,9 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("syncTime", { song, time });
   });
 
-  // -------------------- YouTube
+  // ====================
+  // YouTube
+  // ====================
   socket.on("playYT", ({ roomId, videoId, time }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -194,7 +235,9 @@ io.on("connection", (socket) => {
     });
   });
 
-  // -------------------- Disconnect
+  // ====================
+  // Disconnect
+  // ====================
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
@@ -203,19 +246,16 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
     if (rooms[roomId].users.length === 0) {
-      const room = rooms[roomId];
-      if (room.song && room.song.startsWith("/uploads/")) {
-        const filePath = path.resolve(__dirname, "." + room.song);
-        fs.unlink(filePath, () => {});
-      }
       delete rooms[roomId];
-      delete roomTokens[roomId]; // 🔐 cleanup tokens
+      delete roomTokens[roomId];
       console.log("🧹 Room cleaned:", roomId);
     }
   });
 });
 
-// -------------------- Server start
+// ====================
+// Server start
+// ====================
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
