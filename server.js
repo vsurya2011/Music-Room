@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import fs from "fs";
+import crypto from "crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -56,10 +57,42 @@ app.get("/room/:roomId", (req, res) => {
 // --------------------
 const rooms = {};
 
+// 🔐 TOKEN STORE (roomId -> Set(tokens))
+const roomTokens = {};
+
+// -------------------- Socket.IO
+// --------------------
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // -------------------- Join Room
+  // -------------------- CREATE ROOM (HOST)
+  socket.on("createRoom", ({ roomId }) => {
+    const token = crypto.randomBytes(16).toString("hex");
+
+    if (!roomTokens[roomId]) {
+      roomTokens[roomId] = new Set();
+    }
+
+    roomTokens[roomId].add(token);
+
+    socket.emit("roomCreated", { roomId, token });
+  });
+
+  // -------------------- VALIDATE TOKEN (ONE TIME)
+  socket.on("validateToken", ({ roomId, token }) => {
+    if (
+      roomTokens[roomId] &&
+      roomTokens[roomId].has(token)
+    ) {
+      // Allow once
+      roomTokens[roomId].delete(token);
+      socket.emit("tokenResult", { success: true });
+    } else {
+      socket.emit("tokenResult", { success: false });
+    }
+  });
+
+  // -------------------- Join Room (AFTER TOKEN OK)
   socket.on("joinRoom", ({ roomId, username }) => {
     socket.join(roomId);
     socket.roomId = roomId;
@@ -71,7 +104,7 @@ io.on("connection", (socket) => {
         song: null,
         songName: null,
         ytVideoId: null,
-        time: 0, // Tracked time for both local and YT
+        time: 0,
         playing: false,
         lastUpdate: null
       };
@@ -81,10 +114,8 @@ io.on("connection", (socket) => {
       rooms[roomId].users.push(socket.username);
     }
 
-    // Send updated users list
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // Send current room state to the newly joined user
     const room = rooms[roomId];
     if (room.song) {
       socket.emit("playSong", {
@@ -94,23 +125,22 @@ io.on("connection", (socket) => {
         playing: room.playing
       });
     } else if (room.ytVideoId) {
-      // Added time and playing state to YT join logic
-      socket.emit("playYT", { 
-        videoId: room.ytVideoId, 
-        time: room.time, 
-        playing: room.playing 
+      socket.emit("playYT", {
+        videoId: room.ytVideoId,
+        time: room.time,
+        playing: room.playing
       });
     }
   });
 
-  // -------------------- Local song events
+  // -------------------- Local Song
   socket.on("playSong", ({ roomId, song, songName, time }) => {
     const room = rooms[roomId];
     if (!room) return;
 
     room.song = song;
     room.songName = songName;
-    room.ytVideoId = null; // clear any YT song
+    room.ytVideoId = null;
     room.time = time || 0;
     room.playing = true;
     room.lastUpdate = Date.now();
@@ -139,14 +169,13 @@ io.on("connection", (socket) => {
   socket.on("syncTime", ({ roomId, song, time }) => {
     const room = rooms[roomId];
     if (!room) return;
-    
-    // Sync time for either local song or YouTube
+
     room.time = time;
     room.lastUpdate = Date.now();
     socket.to(roomId).emit("syncTime", { song, time });
   });
 
-  // -------------------- YouTube events
+  // -------------------- YouTube
   socket.on("playYT", ({ roomId, videoId, time }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -155,14 +184,13 @@ io.on("connection", (socket) => {
     room.songName = null;
     room.ytVideoId = videoId;
     room.playing = true;
-    // Store the time so resumes don't start from zero
-    room.time = time || room.time || 0; 
+    room.time = time || room.time || 0;
     room.lastUpdate = Date.now();
 
-    io.to(roomId).emit("playYT", { 
-      videoId, 
-      time: room.time, 
-      playing: true 
+    io.to(roomId).emit("playYT", {
+      videoId,
+      time: room.time,
+      playing: true
     });
   });
 
@@ -174,7 +202,6 @@ io.on("connection", (socket) => {
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // If room empty, clean uploads & remove room
     if (rooms[roomId].users.length === 0) {
       const room = rooms[roomId];
       if (room.song && room.song.startsWith("/uploads/")) {
@@ -182,6 +209,7 @@ io.on("connection", (socket) => {
         fs.unlink(filePath, () => {});
       }
       delete rooms[roomId];
+      delete roomTokens[roomId]; // 🔐 cleanup tokens
       console.log("🧹 Room cleaned:", roomId);
     }
   });

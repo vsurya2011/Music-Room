@@ -157,6 +157,44 @@
     
     setTimeout(() => { suppressYTEmit = false; }, 800);
   }
+  // -----------------------
+// 🔐 TOKEN ACCESS CHECK
+// -----------------------
+function validateAccessAndInit() {
+  const params = new URLSearchParams(window.location.search);
+  const roomId = params.get("room");
+  const token = params.get("token");
+
+  if (!roomId || !token) {
+    document.body.innerHTML = `
+      <h2 style="color:white;text-align:center;margin-top:40vh">
+        🚫 Invalid or missing invite link
+      </h2>`;
+    return;
+  }
+
+  localStorage.setItem("roomId", roomId);
+
+  const socket = io();
+
+  socket.emit("validateToken", { roomId, token });
+
+  socket.on("tokenResult", ({ success }) => {
+    if (!success) {
+      document.body.innerHTML = `
+        <h2 style="color:white;text-align:center;margin-top:40vh">
+          🚫 Access Denied da <br>
+          This invite link is already used
+        </h2>`;
+      return;
+    }
+
+    // ✅ ACCESS GRANTED
+    socket.disconnect(); // clean temp socket
+    initRoom(); // your existing function
+  });
+}
+
 
   // -----------------------
   // Main init
@@ -466,5 +504,7 @@
     socket.emit('requestState', { roomId: roomCode });
   }
 
-  if (window.location.pathname.endsWith('room.html')) window.addEventListener('DOMContentLoaded', initRoom);
+ if (window.location.pathname.endsWith('room.html'))
+  window.addEventListener('DOMContentLoaded', validateAccessAndInit);
+
 })();
