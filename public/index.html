@@ -8,9 +8,8 @@
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
 
     body {
-      /* Use your AI.jpg as background */
       background: url('a.jpg') no-repeat center center fixed;
-      background-size: cover; /* responsive: cover entire screen */
+      background-size: cover;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -19,13 +18,14 @@
     }
 
     .container {
-      background: rgba(0, 0, 0, 0.5); /* dark overlay for readability */
+      background: rgba(0, 0, 0, 0.5);
       padding: 40px 50px;
       border-radius: 15px;
       box-shadow: 0 8px 25px rgba(0,0,0,0.5);
       text-align: center;
       width: 350px;
       backdrop-filter: blur(8px);
+      display: none; /* hidden by default until password verified or direct access */
     }
 
     h2 {
@@ -87,7 +87,7 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="container" id="mainContainer">
     <h2>🎤 Music Room</h2>
 
     <div>
@@ -107,6 +107,37 @@
   </div>
 
   <script>
+    const OWNER_PASSWORD = "SURYA123"; // change to your desired password
+
+    function getQueryParam(key) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(key);
+    }
+
+    function askPasswordOrDirectAccess() {
+      const access = getQueryParam("access");
+      const sharedRoom = getQueryParam("roomId");
+      const sharedUser = getQueryParam("username");
+
+      if (access === "shared" && sharedRoom) {
+        // Direct access via shared link
+        localStorage.setItem("roomId", sharedRoom);
+        localStorage.setItem("username", sharedUser || "Guest");
+        window.location.href = "room.html";
+        return;
+      }
+
+      const pwd = prompt("Enter owner password to access Music Room:");
+      if (pwd === OWNER_PASSWORD) {
+        document.getElementById("mainContainer").style.display = "block";
+      } else {
+        alert("❌ Wrong password! You cannot access this page.");
+        document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:40vh'>Access Denied</h2>";
+      }
+    }
+
+    askPasswordOrDirectAccess();
+
     function createRoom() {
       const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
       document.getElementById("room").value = roomId;
@@ -122,7 +153,6 @@
       localStorage.setItem("roomId", roomId);
       localStorage.setItem("username", username);
 
-      // Go to room page
       window.location.href = "room.html";
     }
   </script>

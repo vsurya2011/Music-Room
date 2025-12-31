@@ -209,6 +209,31 @@
         }
       });
     }
+const copyLinkBtn = document.getElementById("copyLinkBtn");
+const linkStatus = document.getElementById("linkStatus");
+
+if(copyLinkBtn) {
+  copyLinkBtn.addEventListener("click", () => {
+    const roomId = localStorage.getItem("roomId") || "";
+    const username = localStorage.getItem("username") || "Guest";
+
+    if(!roomId) {
+      alert("Room ID not found!");
+      return;
+    }
+
+    // Create shareable URL
+    const url = `${window.location.origin}/index.html?access=shared&roomId=${roomId}&username=${encodeURIComponent(username)}`;
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(url).then(() => {
+      linkStatus.textContent = "✅ Link copied!";
+      setTimeout(() => { linkStatus.textContent = ""; }, 3000);
+    }).catch(() => {
+      linkStatus.textContent = "❌ Failed to copy";
+    });
+  });
+}
 
     // -----------------------
     // YouTube socket events
