@@ -6,15 +6,38 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
-    body { background: url('a.jpg') no-repeat center center fixed; background-size: cover; min-height: 100vh; display: flex; justify-content: center; align-items: center; color: #fff; }
-    .container { background: rgba(0, 0, 0, 0.5); padding: 40px 50px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; width: 350px; backdrop-filter: blur(8px); }
-    h2 { margin-bottom: 30px; font-size: 28px; font-weight: 700; text-shadow: 1px 1px 5px rgba(0,0,0,0.7); }
-    label { display: block; margin-bottom: 5px; font-weight: 500; text-align: left; }
-    input { width: 100%; padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: none; outline: none; font-size: 16px; }
-    input::placeholder { color: #ccc; }
-    button { width: 48%; padding: 12px 0; margin: 5px 1%; border: none; border-radius: 8px; background: #ff6b81; color: #fff; font-size: 16px; cursor: pointer; transition: 0.3s; font-weight: 500; }
-    button:hover { background: #ff4757; }
-    @media (max-width: 400px) { .container { width: 90%; padding: 30px 20px; } button { width: 100%; margin: 5px 0; } }
+    body {
+      background: url('a.jpg') no-repeat center center fixed;
+      background-size: cover;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+    }
+    .container {
+      background: rgba(0,0,0,0.55);
+      padding: 40px 50px;
+      border-radius: 15px;
+      text-align: center;
+      width: 350px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    }
+    h2 { margin-bottom: 30px; font-size:28px; font-weight:700; text-shadow:1px 1px 5px rgba(0,0,0,0.7); }
+    label { display:block; margin-bottom:5px; font-weight:500; text-align:left; }
+    input { width:100%; padding:12px 15px; margin-bottom:20px; border-radius:8px; border:none; outline:none; font-size:16px; }
+    input::placeholder { color:#ccc; }
+    button {
+      width: 48%; padding:12px 0; margin:5px 1%;
+      border:none; border-radius:8px; background:#ff6b81;
+      color:#fff; font-size:16px; cursor:pointer; font-weight:500; transition:0.3s;
+    }
+    button:hover { background:#ff4757; }
+    @media (max-width:400px){
+      .container { width:90%; padding:30px 20px; }
+      button { width:100%; margin:5px 0; }
+    }
   </style>
 </head>
 <body>
@@ -32,80 +55,27 @@
     </div>
 
     <div>
-      <button onclick="createRoom()">Create Room</button>
       <button onclick="joinRoom()">Join Room</button>
+      <button onclick="ownerLogin()">Owner Login</button>
     </div>
   </div>
 
   <script>
-// ----------- Room Security Logic -----------
-    const params = new URLSearchParams(window.location.search);
-    const roomId = params.get('room');
-    const token = params.get('token');
-    const storedToken = localStorage.getItem('roomToken');
-    const username = localStorage.getItem('username');
-
-    // Check for required info
-    if (!roomId || !token || token !== storedToken || !username) {
-      alert("❌ Invalid or expired room link! Please go back to home and create/join a room.");
-      window.location.href = "index.html";
-    } else {
-      console.log(`Welcome ${username} to room ${roomId}`);
-    }
-
-    // ----------- Invalidate token when user leaves -----------
-    window.addEventListener('beforeunload', () => {
-      // Remove token from localStorage to make link invalid
-      localStorage.removeItem('roomToken');
-    });
-
-    // Optional: Prevent back navigation after leaving room
-    history.pushState(null, null, location.href);
-    window.onpopstate = function () {
-      history.go(1);
-    };
-    // Map to store one-time room tokens
-    const oneTimeTokens = {};
-
-    function createRoom() {
-      const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const token = Math.random().toString(36).substring(2, 10);
-      oneTimeTokens[roomId] = token; // save token temporarily
-
-      document.getElementById("room").value = roomId;
-
-      alert(`Share this link only once: room.html?room=${roomId}&token=${token}`);
-      joinRoom();
-    }
-
     function joinRoom() {
       const roomId = document.getElementById("room").value.trim();
-      const username = document.getElementById("username").value.trim();
+      const username = document.getElementById("username").value.trim() || "Guest";
 
-      if (!roomId || !username) return alert("Please enter your username and room code!");
+      if(!roomId) return alert("Enter a room code!");
 
-      const token = oneTimeTokens[roomId]; // check if token exists
-      if (token) {
-        localStorage.setItem("roomId", roomId);
-        localStorage.setItem("username", username);
-        localStorage.setItem("roomToken", token); // save for room validation
-        // Remove token after first use
-        delete oneTimeTokens[roomId];
-        window.location.href = `room.html?room=${roomId}&token=${token}`;
-      } else {
-        alert("❌ Invalid or expired room link!");
-      }
+      // Navigate to room via token not needed for normal user
+      localStorage.setItem("username", username);
+      window.location.href = `/room/${roomId}`;
     }
 
-    // For joining via shared link
-    const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get('room');
-    const tokenParam = params.get('token');
-    if (roomParam && tokenParam) {
-      const username = prompt("Enter your name to join this room:") || "Guest";
-      document.getElementById('username').value = username;
-      document.getElementById('room').value = roomParam;
-      joinRoom();
+    function ownerLogin() {
+      const roomId = document.getElementById("room").value.trim();
+      if(!roomId) return alert("Enter a room code for owner login!");
+      window.location.href = `/owner-login/${roomId}`;
     }
   </script>
 </body>

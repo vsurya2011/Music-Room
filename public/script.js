@@ -1,33 +1,5 @@
 // script.js - Full synchronized music room (YT + local + playlists)
 (function () {
-// -----------------------
-// ROOM CLOSURE & ONE-TIME LINK LOGIC
-// -----------------------
-window.addEventListener('DOMContentLoaded', () => {
-    const socket = io(); // Make sure socket is initialized
-    const roomId = localStorage.getItem('roomId');
-    const username = localStorage.getItem('username');
-
-    if (!roomId || !username) {
-        alert("❌ Invalid session! Please create or join a room from home.");
-        window.location.href = "index.html";
-    }
-
-    // Notify server when user leaves
-    window.addEventListener('beforeunload', () => {
-        if (username === localStorage.getItem('ownerName')) {
-            socket.emit('roomClosed', { roomId });
-        }
-        localStorage.removeItem('roomToken');
-    });
-
-    // Listen if room is closed by owner
-    socket.on('roomClosed', () => {
-        alert("⚠️ Room closed by owner. You will be redirected to home.");
-        localStorage.removeItem('roomToken');
-        window.location.href = "index.html";
-    });
-});
 
   // -----------------------
   // Helper UI
@@ -238,6 +210,32 @@ window.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
+const copyLinkBtn = document.getElementById("copyLinkBtn");
+const linkStatus = document.getElementById("linkStatus");
+
+if(copyLinkBtn) {
+  copyLinkBtn.addEventListener("click", () => {
+    const roomId = localStorage.getItem("roomId") || "";
+    const username = localStorage.getItem("username") || "Guest";
+
+    if(!roomId) {
+      alert("Room ID not found!");
+      return;
+    }
+
+    // Create shareable URL
+    const url = `${window.location.origin}/index.html?access=shared&roomId=${roomId}&username=${encodeURIComponent(username)}`;
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(url).then(() => {
+      linkStatus.textContent = "✅ Link copied!";
+      setTimeout(() => { linkStatus.textContent = ""; }, 3000);
+    }).catch(() => {
+      linkStatus.textContent = "❌ Failed to copy";
+    });
+  });
+}
+
 
     // -----------------------
     // YouTube socket events
