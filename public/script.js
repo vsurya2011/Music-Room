@@ -75,16 +75,18 @@
           const playPauseBtn = document.getElementById('playPauseBtn');
           const roomCode = localStorage.getItem('roomId');
           const socket = window.__musicRoom ? window.__musicRoom.socket : null;
+          const canControl = isOwner || (window.__musicRoom && window.__musicRoom.publicControl);
+          
           if (event.data === YT.PlayerState.PLAYING) {
             ytPlaying = true;
             if(playPauseBtn) playPauseBtn.innerHTML = "❚❚";
-            if (!suppressYTEmit && socket && isOwner) socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
+            if (!suppressYTEmit && socket && canControl) socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
           } else if (event.data === YT.PlayerState.PAUSED) {
             ytPlaying = false;
             if(playPauseBtn) playPauseBtn.innerHTML = "►";
-            if (!suppressYTEmit && socket && isOwner) socket.emit("pauseSong", { roomId: roomCode });
+            if (!suppressYTEmit && socket && canControl) socket.emit("pauseSong", { roomId: roomCode });
           } else if (event.data === YT.PlayerState.ENDED) {
-            if (isOwner) document.getElementById('nextBtn').click();
+            if (canControl) document.getElementById('nextBtn').click();
           }
         }
       },
@@ -124,7 +126,6 @@
 
     document.getElementById('roomCodeDisplay').innerText = roomCode || 'UNKNOWN';
     
-    // IMPORTANT: Send the password stored in localStorage to the server for verification
     socket.emit('joinRoom', { roomId: roomCode, username, password });
 
     const playPauseBtn = document.getElementById('playPauseBtn');
@@ -137,44 +138,77 @@
     const trackTitleEl = document.getElementById('trackTitle');
     const tamilSelect = document.getElementById('tamilSongs');
     const englishSelect = document.getElementById('englishSongs');
+    const toggleControlBtn = document.getElementById('toggleControlBtn');
+    const ownerOnlyInterface = document.getElementById('ownerOnlyInterface');
 
     let suppressEmit = false;
     let lastCategory = 'both';
-    window.__musicRoom = { socket, player };
+    window.__musicRoom = { socket, player, publicControl: false };
 
     /**
-     * PERMISSIONS HANDLER: 
-     * Hides or shows buttons based on server verification
+     * PERMISSIONS HANDLER
      */
     socket.on("permissions", (data) => {
       isOwner = data.isOwner;
-      const statusMsg = document.getElementById('statusMsg');
+      window.__musicRoom.publicControl = data.publicControl;
+      updateControlUI(data.publicControl);
       
-      if (isOwner) {
-        // Show all control blocks for authorized user
-        document.querySelectorAll('.owner-control-block').forEach(el => el.style.display = 'block');
-        document.getElementById('ownerControlBlock').style.display = 'block';
-        if (statusMsg) statusMsg.innerText = "Connected as Admin/Owner";
-        if (progress) progress.style.cursor = 'pointer';
-      } else {
-        // Hide control blocks for listeners
-        document.querySelectorAll('.owner-control-block').forEach(el => el.style.display = 'none');
-        document.getElementById('ownerControlBlock').style.display = 'none';
-        if (statusMsg) statusMsg.innerText = "Connected as Listener";
-        if (progress) progress.style.cursor = 'default';
+      if (isOwner && ownerOnlyInterface) {
+        ownerOnlyInterface.style.display = 'block';
       }
     });
+
+    socket.on("publicControlUpdated", (data) => {
+      window.__musicRoom.publicControl = data.publicControl;
+      updateControlUI(data.publicControl);
+    });
+
+    function updateControlUI(isPublic) {
+      const statusMsg = document.getElementById('statusMsg');
+      const ownerBlock = document.getElementById('ownerControlBlock');
+      const controlBtns = document.querySelectorAll('.owner-control-block');
+      
+      const hasAccess = isOwner || isPublic;
+
+      if (hasAccess) {
+        ownerBlock.style.display = 'block';
+        controlBtns.forEach(el => el.style.display = 'block');
+        progress.style.cursor = 'pointer';
+        if (statusMsg) {
+          statusMsg.innerText = isOwner ? "Connected as Admin/Owner" : "Public Control Enabled";
+        }
+      } else {
+        ownerBlock.style.display = 'none';
+        controlBtns.forEach(el => el.style.display = 'none');
+        progress.style.cursor = 'default';
+        if (statusMsg) {
+          statusMsg.innerText = "Connected as Listener";
+        }
+      }
+
+      if (isOwner && toggleControlBtn) {
+        toggleControlBtn.innerText = isPublic ? "🔒 Lock Controls" : "🔓 Allow Friends to Control";
+      }
+    }
+
+    if (toggleControlBtn) {
+      toggleControlBtn.onclick = () => {
+        socket.emit("togglePublicControl", { roomId: roomCode });
+      };
+    }
 
     socket.on("playYT", ({ videoId, time = 0, playing = true }) => playYT(videoId, time, playing));
 
     setInterval(() => {
-      if (isOwner && ytPlayer && ytPlaying && currentYTId && !suppressYTEmit) {
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (canControl && ytPlayer && ytPlaying && currentYTId && !suppressYTEmit) {
         socket.emit("syncTime", { roomId: roomCode, song: "YOUTUBE_VIDEO", time: ytPlayer.getCurrentTime() });
       }
     }, 2000);
 
     document.getElementById('playYTBtn').onclick = () => {
-      if(!isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if(!canControl) return;
       const videoId = extractVideoId(document.getElementById('ytLink').value.trim());
       if (videoId) socket.emit("playYT", { roomId: roomCode, videoId });
     };
@@ -213,7 +247,8 @@
     });
 
     playPauseBtn.addEventListener('click', () => {
-      if (!isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (!canControl) return;
       if (currentYTId) {
         if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) socket.emit("pauseSong", { roomId: roomCode });
         else socket.emit("playYT", { roomId: roomCode, videoId: currentYTId, time: ytPlayer.getCurrentTime() });
@@ -236,14 +271,16 @@
 
     player.addEventListener('play', () => {
       playPauseBtn.innerHTML = '❚❚';
-      if (suppressEmit || !isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (suppressEmit || !canControl) return;
       const rel = songPathToRelative(player.src);
       socket.emit('playSong', { roomId: roomCode, song: rel, time: player.currentTime, songName: songNameFromPath(rel) });
     });
 
     player.addEventListener('pause', () => {
       playPauseBtn.innerHTML = '►';
-      if (suppressEmit || !isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (suppressEmit || !canControl) return;
       socket.emit('pauseSong', { roomId: roomCode });
     });
 
@@ -254,24 +291,30 @@
       totalTimeEl.textContent = formatTime(player.duration);
     });
 
-    player.addEventListener('ended', () => { if (isOwner) nextBtn.click(); });
+    player.addEventListener('ended', () => { 
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (canControl) nextBtn.click(); 
+    });
 
     nextBtn.addEventListener('click', () => {
-      if (!isOwner || currentYTId) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (!canControl || currentYTId) return;
       let list = getAllSongs(lastCategory);
       let idx = (list.indexOf(songPathToRelative(player.src)) + 1) % list.length;
       player.src = list[idx]; player.play();
     });
 
     prevBtn.addEventListener('click', () => {
-      if (!isOwner || currentYTId) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (!canControl || currentYTId) return;
       let list = getAllSongs(lastCategory);
       let idx = (list.indexOf(songPathToRelative(player.src)) - 1 + list.length) % list.length;
       player.src = list[idx]; player.play();
     });
 
     progress.addEventListener('mousedown', (e) => {
-      if (!isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if (!canControl) return;
       const rect = progress.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
       if (currentYTId) {
@@ -285,19 +328,22 @@
     });
 
     document.getElementById('playTamilBtn').onclick = () => {
-      if(!isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if(!canControl) return;
       lastCategory='tamil'; currentYTId = null;
       player.src = tamilSelect.value; player.play();
     };
 
     document.getElementById('playEnglishBtn').onclick = () => {
-      if(!isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if(!canControl) return;
       lastCategory='english'; currentYTId = null;
       player.src = englishSelect.value; player.play();
     };
 
     document.getElementById("playLocalBtn").onclick = async () => {
-      if(!isOwner) return;
+      const canControl = isOwner || window.__musicRoom.publicControl;
+      if(!canControl) return;
       const file = document.getElementById("fileInput").files[0];
       if (!file) return;
       const formData = new FormData(); formData.append("song", file);

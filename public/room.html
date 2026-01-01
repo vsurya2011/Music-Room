@@ -13,14 +13,21 @@
     #nowPlaying { text-align:center; margin:8px 0 16px; color:#00e6c3; font-weight:600; font-size: 14px; }
     label { display:block; margin:8px 0 6px; font-weight:500; font-size: 14px; color: #ddd; }
     select { width:100%; padding:10px 12px; margin-bottom:10px; border-radius:8px; border:none; font-size:15px; background: #fff; color: #333; }
+    
     button { width:100%; padding:10px; margin-bottom:12px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:15px; font-weight:500; cursor:pointer; transition: 0.2s; }
     button:hover { background:#ff4757; transform: translateY(-1px); }
+    
+    /* Special Green button for the Public Toggle */
+    #toggleControlBtn { background: #4caf50; margin-top: 10px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3); }
+    #toggleControlBtn:hover { background: #43a047; }
+
     audio { width:100%; margin-top:12px; border-radius:8px; outline:none; background:rgba(255,255,255,0.04); padding:6px; display: none; }
     input[type=text], input[type=file] { width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:none; font-size:14px; }
     h3 { font-size: 16px; margin: 15px 0 10px; color: #ffeb3b; border-left: 3px solid #ff6b81; padding-left: 10px; }
     
-    /* New Status Message Style */
-    #statusMsg { font-size: 12px; text-align: center; color: #aaa; margin-top: 10px; }
+    #statusMsg { font-size: 13px; text-align: center; color: #00e6c3; margin-top: 10px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 5px; }
+    
+    #ownerOnlyInterface { display: none; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.2); margin-bottom: 15px; padding-bottom: 5px; }
   </style>
 </head>
 <body>
@@ -31,9 +38,11 @@
     <label for="userSelect">👥 Friends in room</label>
     <select id="userSelect" size="3" style="height:80px;"></select>
 
+    <div id="ownerOnlyInterface">
+        <button id="toggleControlBtn">🔓 Allow Friends to Control</button>
+    </div>
+
     <div id="ownerControlBlock" style="display: none;">
-      <hr style="margin:20px 0; border:none; height:1px; background:rgba(255,255,255,0.2)">
-      
       <h3>🎵 Tamil Songs</h3>
       <select id="tamilSongs">
         <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
@@ -152,7 +161,7 @@
       <button id="playYTBtn">Sync YouTube</button>
     </div>
 
-    <div id="statusMsg">Connected as Listener</div>
+    <div id="statusMsg">Connecting...</div>
 
     <div id="ytPlayer"></div>
     <audio id="player" controls></audio>

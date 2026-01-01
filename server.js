@@ -69,7 +69,8 @@ io.on("connection", (socket) => {
         ytVideoId: null,
         time: 0,
         playing: false,
-        lastUpdate: null
+        lastUpdate: null,
+        publicControl: false // New: Track if everyone can control music
       };
     }
 
@@ -80,8 +81,11 @@ io.on("connection", (socket) => {
     // Notify ALL users in the room of the updated list
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
     
-    // Notify the specific client of their permission level (isOwner: true/false)
-    socket.emit("permissions", { isOwner: socket.isOwner });
+    // Notify client of their permission level and the room's control status
+    socket.emit("permissions", { 
+        isOwner: socket.isOwner, 
+        publicControl: rooms[roomId].publicControl 
+    });
 
     // Sync the new user with current music status
     const room = rooms[roomId];
@@ -101,22 +105,32 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Listener for the Owner to toggle public access
+  socket.on("togglePublicControl", ({ roomId }) => {
+    if (socket.isOwner && rooms[roomId]) {
+      rooms[roomId].publicControl = !rooms[roomId].publicControl;
+      // Broadcast the new status to everyone in the room
+      io.to(roomId).emit("publicControlUpdated", { 
+        publicControl: rooms[roomId].publicControl 
+      });
+    }
+  });
+
   /**
-   * SECURITY HELPER
-   * This function wraps any music control logic. 
-   * If socket.isOwner is false, the action is ignored.
+   * SECURITY HELPER (Updated)
+   * If socket is the Owner OR the room has Public Control enabled, allow action.
    */
-  const onlyOwner = (action) => {
-    if (socket.isOwner) {
+  const canControl = (action) => {
+    const room = rooms[socket.roomId];
+    if (socket.isOwner || (room && room.publicControl)) {
       action();
     } else {
-      console.log(`Unauthorized action attempt by: ${socket.username}`);
+      console.log(`Blocked control attempt by: ${socket.username}`);
     }
   };
 
-  // Play a standard MP3/Uploaded song
   socket.on("playSong", (data) => {
-    onlyOwner(() => {
+    canControl(() => {
       const room = rooms[data.roomId];
       if (!room) return;
       room.song = data.song;
@@ -125,18 +139,12 @@ io.on("connection", (socket) => {
       room.time = data.time || 0;
       room.playing = true;
       room.lastUpdate = Date.now();
-      io.to(data.roomId).emit("playSong", { 
-        song: data.song, 
-        songName: data.songName, 
-        time: room.time, 
-        playing: true 
-      });
+      io.to(data.roomId).emit("playSong", { song: data.song, songName: data.songName, time: room.time, playing: true });
     });
   });
 
-  // Pause the current song (YT or MP3)
   socket.on("pauseSong", ({ roomId }) => {
-    onlyOwner(() => {
+    canControl(() => {
       const room = rooms[roomId];
       if (!room) return;
       if (room.playing && room.lastUpdate) {
@@ -148,21 +156,18 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Keep the progress bar synced across all users
   socket.on("syncTime", ({ roomId, song, time }) => {
-    onlyOwner(() => {
+    canControl(() => {
       const room = rooms[roomId];
       if (!room) return;
       room.time = time;
       room.lastUpdate = Date.now();
-      // Broadcast to everyone else in the room
       socket.to(roomId).emit("syncTime", { song, time });
     });
   });
 
-  // Play a YouTube video
   socket.on("playYT", ({ roomId, videoId, time }) => {
-    onlyOwner(() => {
+    canControl(() => {
       const room = rooms[roomId];
       if (!room) return;
       room.song = null;
@@ -175,28 +180,22 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Handle Disconnection and Cleanup
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
     
-    // Remove user from the list
     rooms[roomId].users = rooms[roomId].users.filter(u => u !== username);
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
 
-    // If room is empty, delete it and clear any temporary uploaded files
     if (rooms[roomId].users.length === 0) {
       const room = rooms[roomId];
       if (room.song && room.song.startsWith("/uploads/")) {
         const filePath = path.resolve(__dirname, "." + room.song);
         if (fs.existsSync(filePath)) {
-          fs.unlink(filePath, (err) => {
-            if (err) console.log("Cleanup error:", err);
-          });
+          fs.unlink(filePath, (err) => { if (err) console.log(err); });
         }
       }
       delete rooms[roomId];
-      console.log(`Room ${roomId} closed and cleaned up.`);
     }
   });
 });
