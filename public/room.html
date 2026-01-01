@@ -7,24 +7,8 @@
   <script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
-    body {
-      background: url('AI.jpg') no-repeat center center fixed;
-      background-size: cover;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 40px 20px;
-      color: #fff;
-    }
-    .container {
-      background: rgba(0, 0, 0, 0.5);
-      border-radius: 15px;
-      padding: 20px 24px;
-      width: 420px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-    }
+    body { background: url('AI.jpg') no-repeat center center fixed; background-size: cover; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 40px 20px; color: #fff; }
+    .container { background: rgba(0, 0, 0, 0.5); border-radius: 15px; padding: 20px 24px; width: 420px; backdrop-filter: blur(10px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
     h2 { text-align:center; margin-bottom: 8px; font-size:24px; font-weight:700; text-shadow: 1px 1px 5px rgba(0,0,0,0.7);}
     #nowPlaying { text-align:center; margin:8px 0 16px; color:#00e6c3; font-weight:600; }
     label { display:block; margin:8px 0 6px; font-weight:500; }
@@ -33,172 +17,139 @@
     button:hover { background:#ff4757; }
     audio { width:100%; margin-top:12px; border-radius:8px; outline:none; background:rgba(255,255,255,0.04); padding:6px;}
     input[type=text] { width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:none; font-size:15px; }
-    @media (max-width:450px) { .container{width:95%; padding:16px;} }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>🎤 Room <span id="roomCode"></span></h2>
-    <div id="nowPlaying" aria-live="polite">🎶 Now Playing: None</div>
+    <div id="nowPlaying">🎶 Now Playing: None</div>
 
     <label for="userSelect">👥 Friends in room</label>
     <select id="userSelect" size="3" style="height:auto;"></select>
 
-    <hr style="margin:12px 0 14px; border:none; height:1px; background:rgba(255,255,255,0.06)">
-
-    <!-- Tamil Songs -->
-    <div>
-      <h3 style="margin:0 0 8px;">🎵 Tamil Songs</h3>
+    <div class="owner-control-block">
+      <hr style="margin:12px 0; border:none; height:1px; background:rgba(255,255,255,0.1)">
+      <h3>🎵 Tamil Songs</h3>
       <select id="tamilSongs">
         <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
-<option value="songs/tamil/Asku_Laska.mp3">Asku Laska</option>
-<option value="songs/tamil/Aathi.mp3">Aathi</option>
-<option value="songs/tamil/America_Yendralum.mp3">America Yendralum</option>
-<option value="songs/tamil/Ammadi_Un_Azhagu.mp3">Ammadi Un Azhagu</option>
-<option value="songs/tamil/Aye_Aye_Aye.mp3">Aye Aye Aye</option>
-
-<option value="songs/tamil/Chellakuttiye.mp3">Chellakuttiye</option>
-<option value="songs/tamil/Darling_Dambakku.mp3">Darling Dambakku</option>
-<option value="songs/tamil/Irukkana_Idupu_Irukkana.mp3">Irukkana Idupu Irukkana</option>
-<option value="songs/tamil/Kaadhal_En_Kaviye.mp3">Kaadhal En Kaviye</option>
-<option value="songs/tamil/Kannadi_Poove.mp3">Kannadi Poove</option>
-
-<option value="songs/tamil/Karakudi_Ilavarasi.mp3">Karakudi Ilavarasi</option>
-<option value="songs/tamil/Katchi_Sera.mp3">Katchi Sera</option>
-<option value="songs/tamil/Kilimanjaro.mp3">Kilimanjaro</option>
-<option value="songs/tamil/Kuchi_Mittai.mp3">Kuchi Mittai</option>
-<option value="songs/tamil/Maattikkichey_Maattikkichey.mp3">Maattikkichey Maattikkichey</option>
-<option value="songs/tamil/Mudhal_Nee_Mudivum_Nee.mp3">Mudhal Nee Mudivum Nee</option>
-
-<option value="songs/tamil/Naanum_Rowdy_Dhaan.mp3">Naanum Rowdy Dhaan</option>
-<option value="songs/tamil/Nangaai.mp3">Nangaai</option>
-<option value="songs/tamil/Neeyum_Naanum_Anbe.mp3">Neeyum Naanum Anbe</option>
-<option value="songs/tamil/Oorum_Blood.mp3">Oorum Blood</option>
-<option value="songs/tamil/Oru_Kuchi_Oru_Kulfi.mp3">Oru Kuchi Oru Kulfi</option>
-
-<option value="songs/tamil/Otha_Sollaala.mp3">Otha Sollaala</option>
-<option value="songs/tamil/Pakkam_Vanthu.mp3">Pakkam Vanthu</option>
-<option value="songs/tamil/Po_Nee_Po.mp3">Po Nee Po</option>
-<option value="songs/tamil/Saitji_Saitji.mp3">Saitji Saitji</option>
-<option value="songs/tamil/Unna_Paartha.mp3">Unna Paartha</option>
-
-<option value="songs/tamil/Va_Va_Va_Vannila.mp3">Va Va Va Vannila</option>
-<option value="songs/tamil/Vaadi_Vaadi.mp3">Vaadi Vaadi</option>
-<option value="songs/tamil/What_a_Karavaad.mp3">What a Karavaad</option>
-<option value="songs/tamil/Yaen_Ennai_Pirindhaai.mp3">Yaen Ennai Pirindhaai</option>
-
+        <option value="songs/tamil/Asku_Laska.mp3">Asku Laska</option>
+        <option value="songs/tamil/Aathi.mp3">Aathi</option>
+        <option value="songs/tamil/America_Yendralum.mp3">America Yendralum</option>
+        <option value="songs/tamil/Ammadi_Un_Azhagu.mp3">Ammadi Un Azhagu</option>
+        <option value="songs/tamil/Aye_Aye_Aye.mp3">Aye Aye Aye</option>
+        <option value="songs/tamil/Chellakuttiye.mp3">Chellakuttiye</option>
+        <option value="songs/tamil/Darling_Dambakku.mp3">Darling Dambakku</option>
+        <option value="songs/tamil/Irukkana_Idupu_Irukkana.mp3">Irukkana Idupu Irukkana</option>
+        <option value="songs/tamil/Kaadhal_En_Kaviye.mp3">Kaadhal En Kaviye</option>
+        <option value="songs/tamil/Kannadi_Poove.mp3">Kannadi Poove</option>
+        <option value="songs/tamil/Karakudi_Ilavarasi.mp3">Karakudi Ilavarasi</option>
+        <option value="songs/tamil/Katchi_Sera.mp3">Katchi Sera</option>
+        <option value="songs/tamil/Kilimanjaro.mp3">Kilimanjaro</option>
+        <option value="songs/tamil/Kuchi_Mittai.mp3">Kuchi Mittai</option>
+        <option value="songs/tamil/Maattikkichey_Maattikkichey.mp3">Maattikkichey Maattikkichey</option>
+        <option value="songs/tamil/Mudhal_Nee_Mudivum_Nee.mp3">Mudhal Nee Mudivum Nee</option>
+        <option value="songs/tamil/Naanum_Rowdy_Dhaan.mp3">Naanum Rowdy Dhaan</option>
+        <option value="songs/tamil/Nangaai.mp3">Nangaai</option>
+        <option value="songs/tamil/Neeyum_Naanum_Anbe.mp3">Neeyum Naanum Anbe</option>
+        <option value="songs/tamil/Oorum_Blood.mp3">Oorum Blood</option>
+        <option value="songs/tamil/Oru_Kuchi_Oru_Kulfi.mp3">Oru Kuchi Oru Kulfi</option>
+        <option value="songs/tamil/Otha_Sollaala.mp3">Otha Sollaala</option>
+        <option value="songs/tamil/Pakkam_Vanthu.mp3">Pakkam Vanthu</option>
+        <option value="songs/tamil/Po_Nee_Po.mp3">Po Nee Po</option>
+        <option value="songs/tamil/Saitji_Saitji.mp3">Saitji Saitji</option>
+        <option value="songs/tamil/Unna_Paartha.mp3">Unna Paartha</option>
+        <option value="songs/tamil/Va_Va_Va_Vannila.mp3">Va Va Va Vannila</option>
+        <option value="songs/tamil/Vaadi_Vaadi.mp3">Vaadi Vaadi</option>
+        <option value="songs/tamil/What_a_Karavaad.mp3">What a Karavaad</option>
+        <option value="songs/tamil/Yaen_Ennai_Pirindhaai.mp3">Yaen Ennai Pirindhaai</option>
       </select>
       <button id="playTamilBtn">Play Tamil Song</button>
-    </div>
 
-    <!-- English Songs -->
-    <div style="margin-top:10px;">
-      <h3 style="margin:0 0 8px;">🎶 English Songs</h3>
+      <h3>🎶 English Songs</h3>
       <select id="englishSongs">
         <option value="songs/english/A_thousand_years.mp3">A thousand years</option>
-<option value="songs/english/Arcade.mp3">Arcade</option>
-<option value="songs/english/As_it_was.mp3">As it was</option>
-<option value="songs/english/Ashe_Moral_of_the_Story.mp3">Ashe Moral of the Story</option>
-<option value="songs/english/Bad_boy.mp3">Bad boy</option>
-<option value="songs/english/Beliver.mp3">Beliver</option>
-<option value="songs/english/Bones.mp3">Bones</option>
-<option value="songs/english/Cheri_cheri_lady.mp3">Cheri cheri lady</option>
-<option value="songs/english/Closer.mp3">Closer</option>
-<option value="songs/english/Con_clam.mp3">Con clam</option>
-<option value="songs/english/Copines.mp3">Copines</option>
-<option value="songs/english/Cradles.mp3">Cradles</option>
-<option value="songs/english/Cupid.mp3">Cupid</option>
-<option value="songs/english/Dancing_with_your_ghost.mp3">Dancing with your ghost</option>
-<option value="songs/english/Dandelions.mp3">Dandelions</option>
-<option value="songs/english/Danza_kuduro.mp3">Danza kuduro</option>
-<option value="songs/english/Darkside.mp3">Darkside</option>
-<option value="songs/english/Day_and_light.mp3">Day and light</option>
-<option value="songs/english/Enemy.mp3">Enemy</option>
-<option value="songs/english/Faded.mp3">Faded</option>
-<option value="songs/english/Fairytale.mp3">Fairytale</option>
-<option value="songs/english/Gimme_more.mp3">Gimme more</option>
-<option value="songs/english/Habibi.mp3">Habibi</option>
-<option value="songs/english/Heartbreak_anniversary.mp3">Heartbreak anniversary</option>
-<option value="songs/english/Heatwaves.mp3">Heatwaves</option>
-<option value="songs/english/Hey_mama.mp3">Hey mama</option>
-<option value="songs/english/Hips_dont_lie.mp3">Hips don’t lie</option>
-<option value="songs/english/House_of_memories.mp3">House of memories</option>
-<option value="songs/english/I_am_a_rider.mp3">I am a rider</option>
-<option value="songs/english/Industry_baby.mp3">Industry baby</option>
-<option value="songs/english/Infinity.mp3">Infinity</option>
-<option value="songs/english/Jalebi_baby.mp3">Jalebi baby</option>
-<option value="songs/english/Kings_and_queens.mp3">Kings and queens</option>
-<option value="songs/english/Kosandra.mp3">Kosandra</option>
-<option value="songs/english/Let_me_down.mp3">Let me down</option>
-<option value="songs/english/Let_me_love.mp3">Let me love</option>
-<option value="songs/english/Levitating.mp3">Levitating</option>
-<option value="songs/english/Little_do_you_know.mp3">Little do you know</option>
-<option value="songs/english/Living_life.mp3">Living life</option>
-<option value="songs/english/Mi_gente.mp3">Mi gente</option>
-<option value="songs/english/Middle_of_the_night.mp3">Middle of the night</option>
-<option value="songs/english/Mockingbird.mp3">Mockingbird</option>
-<option value="songs/english/Monstero.mp3">Monstero</option>
-<option value="songs/english/Mood.mp3">Mood</option>
-<option value="songs/english/Paris.mp3">Paris</option>
-<option value="songs/english/Pasoori.mp3">Pasoori</option>
-<option value="songs/english/People.mp3">People</option>
-<option value="songs/english/Perfect.mp3">Perfect</option>
-<option value="songs/english/Runfree.mp3">Runfree</option>
-<option value="songs/english/Safari.mp3">Safari</option>
-<option value="songs/english/Savage_love.mp3">Savage love</option>
-<option value="songs/english/Shape_of_you.mp3">Shape of you</option>
-<option value="songs/english/Snap.mp3">Snap</option>
-<option value="songs/english/Stereo_love.mp3">Stereo love</option>
-<option value="songs/english/Sugar_and_brownies.mp3">Sugar and brownies</option>
-<option value="songs/english/Superman.mp3">Superman</option>
-<option value="songs/english/Taki_Taki.mp3">Taki Taki</option>
-<option value="songs/english/Tu_Tu.mp3">Tu Tu</option>
-<option value="songs/english/Under_the_influence.mp3">Under the influence</option>
-<option value="songs/english/Unstoppable.mp3">Unstoppable</option>
-<option value="songs/english/Wahran.mp3">Wahran</option>
-<option value="songs/english/Waka_Waka.mp3">Waka Waka</option>
-<option value="songs/english/Wannabe.mp3">Wannabe</option>
-<option value="songs/english/Watermelon_sugar.mp3">Watermelon sugar</option>
-<option value="songs/english/Whenever_whenever.mp3">Whenever whenever</option>
-<option value="songs/english/Without_me.mp3">Without me</option>
-<option value="songs/english/Worlds_smallest_violin.mp3">World’s smallest violin</option>
-<option value="songs/english/Worth_it.mp3">Worth it</option>
-
+        <option value="songs/english/Arcade.mp3">Arcade</option>
+        <option value="songs/english/As_it_was.mp3">As it was</option>
+        <option value="songs/english/Ashe_Moral_of_the_Story.mp3">Ashe Moral of the Story</option>
+        <option value="songs/english/Bad_boy.mp3">Bad boy</option>
+        <option value="songs/english/Beliver.mp3">Beliver</option>
+        <option value="songs/english/Bones.mp3">Bones</option>
+        <option value="songs/english/Cheri_cheri_lady.mp3">Cheri cheri lady</option>
+        <option value="songs/english/Closer.mp3">Closer</option>
+        <option value="songs/english/Con_clam.mp3">Con clam</option>
+        <option value="songs/english/Copines.mp3">Copines</option>
+        <option value="songs/english/Cradles.mp3">Cradles</option>
+        <option value="songs/english/Cupid.mp3">Cupid</option>
+        <option value="songs/english/Dancing_with_your_ghost.mp3">Dancing with your ghost</option>
+        <option value="songs/english/Dandelions.mp3">Dandelions</option>
+        <option value="songs/english/Danza_kuduro.mp3">Danza kuduro</option>
+        <option value="songs/english/Darkside.mp3">Darkside</option>
+        <option value="songs/english/Day_and_light.mp3">Day and light</option>
+        <option value="songs/english/Enemy.mp3">Enemy</option>
+        <option value="songs/english/Faded.mp3">Faded</option>
+        <option value="songs/english/Fairytale.mp3">Fairytale</option>
+        <option value="songs/english/Gimme_more.mp3">Gimme more</option>
+        <option value="songs/english/Habibi.mp3">Habibi</option>
+        <option value="songs/english/Heartbreak_anniversary.mp3">Heartbreak anniversary</option>
+        <option value="songs/english/Heatwaves.mp3">Heatwaves</option>
+        <option value="songs/english/Hey_mama.mp3">Hey mama</option>
+        <option value="songs/english/Hips_dont_lie.mp3">Hips don’t lie</option>
+        <option value="songs/english/House_of_memories.mp3">House of memories</option>
+        <option value="songs/english/I_am_a_rider.mp3">I am a rider</option>
+        <option value="songs/english/Industry_baby.mp3">Industry baby</option>
+        <option value="songs/english/Infinity.mp3">Infinity</option>
+        <option value="songs/english/Jalebi_baby.mp3">Jalebi baby</option>
+        <option value="songs/english/Kings_and_queens.mp3">Kings and queens</option>
+        <option value="songs/english/Kosandra.mp3">Kosandra</option>
+        <option value="songs/english/Let_me_down.mp3">Let me down</option>
+        <option value="songs/english/Let_me_love.mp3">Let me love</option>
+        <option value="songs/english/Levitating.mp3">Levitating</option>
+        <option value="songs/english/Little_do_you_know.mp3">Little do you know</option>
+        <option value="songs/english/Living_life.mp3">Living life</option>
+        <option value="songs/english/Mi_gente.mp3">Mi gente</option>
+        <option value="songs/english/Middle_of_the_night.mp3">Middle of the night</option>
+        <option value="songs/english/Mockingbird.mp3">Mockingbird</option>
+        <option value="songs/english/Monstero.mp3">Monstero</option>
+        <option value="songs/english/Mood.mp3">Mood</option>
+        <option value="songs/english/Paris.mp3">Paris</option>
+        <option value="songs/english/Pasoori.mp3">Pasoori</option>
+        <option value="songs/english/People.mp3">People</option>
+        <option value="songs/english/Perfect.mp3">Perfect</option>
+        <option value="songs/english/Runfree.mp3">Runfree</option>
+        <option value="songs/english/Safari.mp3">Safari</option>
+        <option value="songs/english/Savage_love.mp3">Savage love</option>
+        <option value="songs/english/Shape_of_you.mp3">Shape of you</option>
+        <option value="songs/english/Snap.mp3">Snap</option>
+        <option value="songs/english/Stereo_love.mp3">Stereo love</option>
+        <option value="songs/english/Sugar_and_brownies.mp3">Sugar and brownies</option>
+        <option value="songs/english/Superman.mp3">Superman</option>
+        <option value="songs/english/Taki_Taki.mp3">Taki Taki</option>
+        <option value="songs/english/Tu_Tu.mp3">Tu Tu</option>
+        <option value="songs/english/Under_the_influence.mp3">Under the influence</option>
+        <option value="songs/english/Unstoppable.mp3">Unstoppable</option>
+        <option value="songs/english/Wahran.mp3">Wahran</option>
+        <option value="songs/english/Waka_Waka.mp3">Waka Waka</option>
+        <option value="songs/english/Wannabe.mp3">Wannabe</option>
+        <option value="songs/english/Watermelon_sugar.mp3">Watermelon sugar</option>
+        <option value="songs/english/Whenever_whenever.mp3">Whenever whenever</option>
+        <option value="songs/english/Without_me.mp3">Without me</option>
+        <option value="songs/english/Worlds_smallest_violin.mp3">World’s smallest violin</option>
+        <option value="songs/english/Worth_it.mp3">Worth it</option>
       </select>
       <button id="playEnglishBtn">Play English Song</button>
+
+      <h3>📂 Local Music</h3>
+      <input type="file" id="fileInput" accept="audio/*" />
+      <button id="playLocalBtn">Play & Share</button>
+
+      <h3>▶️ YouTube</h3>
+      <input type="text" id="ytLink" placeholder="Paste link/ID" />
+      <button id="playYTBtn">Play YouTube Song</button>
     </div>
 
-    <!-- Local Music Picker -->
-    <div style="margin-top:10px;">
-      <h3 style="margin:0 0 8px;">📂 Choose Local Music</h3>
-      <input type="file" id="fileInput" accept="audio/*" style="width:100%; margin-bottom:6px;" />
-      <button id="playLocalBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#6c5ce7; color:#fff; cursor:pointer;">Play & Share</button>
-      <div id="localStatus" style="margin-top:6px; font-size:13px; color:#ffd700;"></div>
-    </div>
-
-<div style="margin-top:15px; text-align:center;">
-  <button id="copyLinkBtn" style="padding:10px 15px; border:none; border-radius:6px; background:#06b6d4; color:white; cursor:pointer;">
-    📋 Copy Share Link
-  </button>
-  <span id="linkStatus" style="margin-left:10px; color:#fff; font-size:14px;"></span>
-</div>
-
-    <!-- YouTube Player Integration -->
-    <div style="margin-top:10px;">
-      <h3 style="margin:0 0 8px;">▶️ Play YouTube Song</h3>
-      
-      <input type="text" id="ytLink" placeholder="Paste YouTube link or ID" />
-      <button id="playYTBtn" style="width:100%; padding:10px; border:none; border-radius:8px; background:#00b894; color:#fff; cursor:pointer;">Play YouTube Song</button>
-<button id="pipBtn" style="width:100%; padding:10px; margin-bottom:12px; border:none; border-radius:8px; background:#f39c12; color:#fff; font-weight:700; cursor:pointer;">📺 Open Mini Player (PiP)</button>
-<div id="ytPlayer"></div>
-      <div id="ytPlayerContainer" style="margin-top:8px;">
-        <div id="ytPlayer"></div>
-      </div>
-    </div>
-
-    <audio id="player" controls></audio>
+    <div id="ytPlayer"></div>
+    <audio id="player"></audio>
   </div>
-
   <script src="script.js"></script>
 </body>
 </html>
