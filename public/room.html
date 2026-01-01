@@ -8,27 +8,32 @@
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
     body { background: url('AI.jpg') no-repeat center center fixed; background-size: cover; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 40px 20px; color: #fff; }
-    .container { background: rgba(0, 0, 0, 0.5); border-radius: 15px; padding: 20px 24px; width: 420px; backdrop-filter: blur(10px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    .container { background: rgba(0, 0, 0, 0.65); border-radius: 15px; padding: 20px 24px; width: 420px; backdrop-filter: blur(15px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); }
     h2 { text-align:center; margin-bottom: 8px; font-size:24px; font-weight:700; text-shadow: 1px 1px 5px rgba(0,0,0,0.7);}
-    #nowPlaying { text-align:center; margin:8px 0 16px; color:#00e6c3; font-weight:600; }
-    label { display:block; margin:8px 0 6px; font-weight:500; }
-    select { width:100%; padding:10px 12px; margin-bottom:10px; border-radius:8px; border:none; font-size:15px;}
-    button { width:100%; padding:10px; margin-bottom:12px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:15px; font-weight:500; cursor:pointer; transition:0.2s;}
-    button:hover { background:#ff4757; }
-    audio { width:100%; margin-top:12px; border-radius:8px; outline:none; background:rgba(255,255,255,0.04); padding:6px;}
-    input[type=text] { width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:none; font-size:15px; }
+    #nowPlaying { text-align:center; margin:8px 0 16px; color:#00e6c3; font-weight:600; font-size: 14px; }
+    label { display:block; margin:8px 0 6px; font-weight:500; font-size: 14px; color: #ddd; }
+    select { width:100%; padding:10px 12px; margin-bottom:10px; border-radius:8px; border:none; font-size:15px; background: #fff; color: #333; }
+    button { width:100%; padding:10px; margin-bottom:12px; border:none; border-radius:8px; background:#ff6b81; color:#fff; font-size:15px; font-weight:500; cursor:pointer; transition: 0.2s; }
+    button:hover { background:#ff4757; transform: translateY(-1px); }
+    audio { width:100%; margin-top:12px; border-radius:8px; outline:none; background:rgba(255,255,255,0.04); padding:6px; display: none; }
+    input[type=text], input[type=file] { width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:none; font-size:14px; }
+    h3 { font-size: 16px; margin: 15px 0 10px; color: #ffeb3b; border-left: 3px solid #ff6b81; padding-left: 10px; }
+    
+    /* New Status Message Style */
+    #statusMsg { font-size: 12px; text-align: center; color: #aaa; margin-top: 10px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>🎤 Room <span id="roomCode"></span></h2>
+    <h2>🎤 Room <span id="roomCodeDisplay"></span></h2>
     <div id="nowPlaying">🎶 Now Playing: None</div>
 
     <label for="userSelect">👥 Friends in room</label>
-    <select id="userSelect" size="3" style="height:auto;"></select>
+    <select id="userSelect" size="3" style="height:80px;"></select>
 
-    <div class="owner-control-block">
-      <hr style="margin:12px 0; border:none; height:1px; background:rgba(255,255,255,0.1)">
+    <div id="ownerControlBlock" style="display: none;">
+      <hr style="margin:20px 0; border:none; height:1px; background:rgba(255,255,255,0.2)">
+      
       <h3>🎵 Tamil Songs</h3>
       <select id="tamilSongs">
         <option value="songs/tamil/Adaada_Adaada.mp3">Adaada Adaada</option>
@@ -63,7 +68,7 @@
         <option value="songs/tamil/What_a_Karavaad.mp3">What a Karavaad</option>
         <option value="songs/tamil/Yaen_Ennai_Pirindhaai.mp3">Yaen Ennai Pirindhaai</option>
       </select>
-      <button id="playTamilBtn">Play Tamil Song</button>
+      <button id="playTamilBtn">Play Tamil Selection</button>
 
       <h3>🎶 English Songs</h3>
       <select id="englishSongs">
@@ -136,20 +141,23 @@
         <option value="songs/english/Worlds_smallest_violin.mp3">World’s smallest violin</option>
         <option value="songs/english/Worth_it.mp3">Worth it</option>
       </select>
-      <button id="playEnglishBtn">Play English Song</button>
+      <button id="playEnglishBtn">Play English Selection</button>
 
-      <h3>📂 Local Music</h3>
+      <h3>📂 Local Files</h3>
       <input type="file" id="fileInput" accept="audio/*" />
-      <button id="playLocalBtn">Play & Share</button>
+      <button id="playLocalBtn">Upload & Play</button>
 
       <h3>▶️ YouTube</h3>
-      <input type="text" id="ytLink" placeholder="Paste link/ID" />
-      <button id="playYTBtn">Play YouTube Song</button>
+      <input type="text" id="ytLink" placeholder="Paste YouTube Link" />
+      <button id="playYTBtn">Sync YouTube</button>
     </div>
 
+    <div id="statusMsg">Connected as Listener</div>
+
     <div id="ytPlayer"></div>
-    <audio id="player"></audio>
+    <audio id="player" controls></audio>
   </div>
-  <script src="script.js"></script>
+
+  <script src="/script.js"></script>
 </body>
 </html>

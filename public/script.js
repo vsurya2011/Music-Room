@@ -1,4 +1,7 @@
 (function () {
+  /**
+   * UI HELPER: Creates the custom music player interface
+   */
   function ensurePlayerUI() {
     if (document.getElementById('custom-player')) return;
     const container = document.createElement('div');
@@ -119,7 +122,9 @@
     const username = localStorage.getItem('username');
     const password = localStorage.getItem('ownerPassword');
 
-    document.getElementById('roomCode').innerText = roomCode || 'UNKNOWN';
+    document.getElementById('roomCodeDisplay').innerText = roomCode || 'UNKNOWN';
+    
+    // IMPORTANT: Send the password stored in localStorage to the server for verification
     socket.emit('joinRoom', { roomId: roomCode, username, password });
 
     const playPauseBtn = document.getElementById('playPauseBtn');
@@ -137,12 +142,25 @@
     let lastCategory = 'both';
     window.__musicRoom = { socket, player };
 
-    // Handle incoming permissions
+    /**
+     * PERMISSIONS HANDLER: 
+     * Hides or shows buttons based on server verification
+     */
     socket.on("permissions", (data) => {
       isOwner = data.isOwner;
-      if (!isOwner) {
-        // Hide control elements for listeners
+      const statusMsg = document.getElementById('statusMsg');
+      
+      if (isOwner) {
+        // Show all control blocks for authorized user
+        document.querySelectorAll('.owner-control-block').forEach(el => el.style.display = 'block');
+        document.getElementById('ownerControlBlock').style.display = 'block';
+        if (statusMsg) statusMsg.innerText = "Connected as Admin/Owner";
+        if (progress) progress.style.cursor = 'pointer';
+      } else {
+        // Hide control blocks for listeners
         document.querySelectorAll('.owner-control-block').forEach(el => el.style.display = 'none');
+        document.getElementById('ownerControlBlock').style.display = 'none';
+        if (statusMsg) statusMsg.innerText = "Connected as Listener";
         if (progress) progress.style.cursor = 'default';
       }
     });
@@ -290,5 +308,8 @@
     };
   }
 
-  if (window.location.pathname.endsWith('room.html')) window.addEventListener('DOMContentLoaded', initRoom);
+  // Ensure init runs on room.html
+  if (window.location.pathname.includes('room.html')) {
+    window.addEventListener('DOMContentLoaded', initRoom);
+  }
 })();

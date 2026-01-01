@@ -7,53 +7,56 @@
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Roboto', sans-serif; }
     body { background: url('a.jpg') no-repeat center center fixed; background-size: cover; min-height: 100vh; display: flex; justify-content: center; align-items: center; color: #fff; }
-    .container { background: rgba(0, 0, 0, 0.5); padding: 40px 50px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; width: 350px; backdrop-filter: blur(8px); }
+    .container { background: rgba(0, 0, 0, 0.7); padding: 40px 50px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; width: 380px; backdrop-filter: blur(10px); }
     h2 { margin-bottom: 30px; font-size: 28px; font-weight: 700; text-shadow: 1px 1px 5px rgba(0,0,0,0.7); }
-    label { display: block; margin-bottom: 5px; font-weight: 500; text-align: left; }
-    input { width: 100%; padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: none; outline: none; font-size: 16px; }
-    input::placeholder { color: #ccc; }
-    button { width: 48%; padding: 12px 0; margin: 5px 1%; border: none; border-radius: 8px; background: #ff6b81; color: #fff; font-size: 16px; cursor: pointer; transition: 0.3s; font-weight: 500; }
-    button:hover { background: #ff4757; }
-    @media (max-width: 400px) { .container { width: 90%; padding: 30px 20px; } button { width: 100%; margin: 5px 0; } }
+    label { display: block; margin-bottom: 5px; font-weight: 500; text-align: left; font-size: 14px; color: #eee; }
+    input { width: 100%; padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: none; outline: none; font-size: 16px; background: #fff; color: #333; }
+    .btn-group { display: flex; gap: 10px; }
+    button { flex: 1; padding: 12px 0; border: none; border-radius: 8px; background: #ff6b81; color: #fff; font-size: 15px; cursor: pointer; transition: 0.3s; font-weight: 600; }
+    button:hover { background: #ff4757; transform: translateY(-2px); }
+    .owner-link { font-size: 12px; color: #aaa; text-decoration: none; margin-top: 15px; display: inline-block; cursor: pointer; }
+    #passArea { display: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>🎤 Music Room</h2>
     <div>
-      <label for="username">Username</label>
+      <label>Username</label>
       <input type="text" id="username" placeholder="Enter your name">
     </div>
     <div>
-      <label for="room">Room Code</label>
-      <input type="text" id="room" placeholder="Enter room code">
+      <label>Room Code</label>
+      <input type="text" id="room" placeholder="Enter code (e.g. SURYA1)">
     </div>
-    <div>
-      <label for="password">Owner Password (Optional)</label>
-      <input type="password" id="password" placeholder="Enter password for control">
+    <div id="passArea">
+      <label>Secret Owner Password</label>
+      <input type="password" id="password" placeholder="Required for Control">
     </div>
-    <div>
-      <button onclick="createRoom()">Create Room</button>
+    <div class="btn-group">
+      <button onclick="createRoom()">Create</button>
       <button onclick="joinRoom()">Join Room</button>
     </div>
+    <p class="owner-link" onclick="document.getElementById('passArea').style.display='block'">Owner Login?</p>
   </div>
 
   <script>
     function createRoom() {
       const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
       document.getElementById("room").value = roomId;
-      joinRoom();
+      document.getElementById('passArea').style.display = 'block';
     }
+
     function joinRoom() {
-      const roomId = document.getElementById("room").value.trim();
+      const roomId = document.getElementById("room").value.trim().toUpperCase();
       const username = document.getElementById("username").value.trim() || "Guest";
       const password = document.getElementById("password").value.trim();
 
-      if (!roomId) return alert("Please enter or create a room code!");
+      if (!roomId) return alert("Please enter or create a Room Code!");
 
       localStorage.setItem("roomId", roomId);
       localStorage.setItem("username", username);
-      localStorage.setItem("ownerPassword", password); // Store password for session
+      localStorage.setItem("ownerPassword", password); // Only if you want control
 
       window.location.href = "room.html";
     }
