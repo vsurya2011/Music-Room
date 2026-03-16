@@ -8,7 +8,7 @@
 # ------------------------------------------
 
 # Navigate to your project folder
-cd "/c/Users/SURYA/Documents/Music Room" || { echo "❌ Project path not found!"; exit 1; }
+cd "/c/Users/SURYA/Documents/1. Music Room" || { echo "❌ Project path not found!"; exit 1; }
 
 # Remove leftover Git lock file if any
 if [ -f ".git/index.lock" ]; then
@@ -27,13 +27,13 @@ git add -A
 echo "📝 Committing changes..."
 git commit -m "$COMMIT_MSG" 2>/dev/null || echo "⚠️ No new changes to commit."
 
-# Set correct remote repo (optional safety)
-git remote set-url origin https://github.com/vsurya2011/Music-Room.git
+# 1. Sync with GitHub first to avoid "rejected" errors
+echo "🔄 Pulling latest changes from GitHub..."
+git pull origin main --rebase
 
-# Push to main branch
+# 2. Now try to push
 echo "🚀 Pushing changes to GitHub..."
 git push origin main
-
 # Done
 echo "✅ All files pushed to GitHub successfully!"
 echo "🌐 Render will automatically detect and redeploy your Music Room app."
