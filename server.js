@@ -22,6 +22,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 const storage = multer.diskStorage({
   destination: uploadsDir,
   filename: (req, file, cb) => {
+    // Unique name to prevent collisions
     cb(null, Date.now() + "-" + file.originalname);
   }
 });
@@ -70,7 +71,7 @@ io.on("connection", (socket) => {
         time: 0,
         playing: false,
         lastUpdate: null,
-        publicControl: false // New: Track if everyone can control music
+        publicControl: false 
       };
     }
 
@@ -78,16 +79,14 @@ io.on("connection", (socket) => {
       rooms[roomId].users.push(socket.username);
     }
 
-    // Notify ALL users in the room of the updated list
     io.to(roomId).emit("updateUsers", rooms[roomId].users);
     
-    // Notify client of their permission level and the room's control status
     socket.emit("permissions", { 
         isOwner: socket.isOwner, 
         publicControl: rooms[roomId].publicControl 
     });
 
-    // Sync the new user with current music status
+    // Sync user
     const room = rooms[roomId];
     if (room.song) {
       socket.emit("playSong", {
@@ -105,27 +104,19 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Listener for the Owner to toggle public access
   socket.on("togglePublicControl", ({ roomId }) => {
     if (socket.isOwner && rooms[roomId]) {
       rooms[roomId].publicControl = !rooms[roomId].publicControl;
-      // Broadcast the new status to everyone in the room
       io.to(roomId).emit("publicControlUpdated", { 
         publicControl: rooms[roomId].publicControl 
       });
     }
   });
 
-  /**
-   * SECURITY HELPER (Updated)
-   * If socket is the Owner OR the room has Public Control enabled, allow action.
-   */
   const canControl = (action) => {
     const room = rooms[socket.roomId];
     if (socket.isOwner || (room && room.publicControl)) {
       action();
-    } else {
-      console.log(`Blocked control attempt by: ${socket.username}`);
     }
   };
 
@@ -180,6 +171,25 @@ io.on("connection", (socket) => {
     });
   });
 
+  // NEW: Temporary File Deletion Logic
+  // This removes the file once it finishes playing to save space
+  socket.on("deleteFinishedSong", ({ songUrl }) => {
+    if (songUrl && songUrl.startsWith("/uploads/")) {
+      // Create absolute path to the file
+      const filePath = path.join(__dirname, songUrl);
+      
+      // We use a small delay (2s) to ensure all clients have finished buffering the end
+      setTimeout(() => {
+        if (fs.existsSync(filePath)) {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error("Error deleting temp file:", err);
+            else console.log("Successfully deleted temporary local song:", songUrl);
+          });
+        }
+      }, 2000); 
+    }
+  });
+
   socket.on("disconnect", () => {
     const { roomId, username } = socket;
     if (!roomId || !rooms[roomId]) return;
@@ -189,8 +199,9 @@ io.on("connection", (socket) => {
 
     if (rooms[roomId].users.length === 0) {
       const room = rooms[roomId];
+      // Cleanup file if the last person leaves while it's playing
       if (room.song && room.song.startsWith("/uploads/")) {
-        const filePath = path.resolve(__dirname, "." + room.song);
+        const filePath = path.join(__dirname, room.song);
         if (fs.existsSync(filePath)) {
           fs.unlink(filePath, (err) => { if (err) console.log(err); });
         }
